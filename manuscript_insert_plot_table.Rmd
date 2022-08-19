@@ -1,0 +1,705 @@
+---
+title: "results"
+author: "Yoo Ri Hwang"
+date: '2022-07-11'
+output: html_document
+---
+
+# Overview
+
+This document is to generate tables/plots for manuscripts. 
+
+some codes for saving the tables were commentised so that it does not overwrite.
+sig rate is significance rate. 
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Pacakges 
+
+```{r}
+
+library(tidyverse)
+library(openxlsx) # for xlsx output 
+library(latex2exp) # so that I can put some latex in my plots 
+
+library(kableExtra)
+library(flextable)
+library(rempsyc)
+
+```
+
+#singularity table
+
+```{r}
+
+# read the data 
+
+sin<-read.csv("appendix/singularity.csv")
+
+# MLM5 and MLM6 showed 100% of singuarity rates, so grab it.
+
+sin<-sin[,grep("MLM5|MLM6|beta|ICC|CN",names(sin))]
+
+sin2<-sin %>%
+  subset(singularity_MLM5==1 | singularity_MLM6==1)
+
+sin2<- sin2[,c(3,5:7)]
+nt<-nice_table(sin2, 
+           title = c("The conditions where MLM5 and MLM6 shows 100% of singularity rate"))
+nt <- nt %>%
+  autofit()
+
+#save_as_docx(nt, path = "tables/singularity.docx")
+
+
+```
+
+# Table for type 1 error rate 
+
+Regarding Type 1 error rate, the 0 ~ 2.5% and 7.5% ~ 100% were especially catch the author's attention. 
+## gender type 1 error rate
+```{r}
+
+# read data 
+g<-read.csv('type1error/beta2.csv')
+
+# take only what we need for this table
+mean<-read.csv('descriptive_results/mean_var.csv')
+mean<-mean[,grep("condition|mean",names(mean))]
+mean<-mean[,grep("condition|ev|two|catwtn|catbtw", names(mean))]
+mean<-mean[,-grep("_t_|_p_|_se_|level|Dev",names(mean))]
+
+g2<-g[,-grep("fx|nx",names(g))]
+gmean<-mean[,-grep("fx|nx",names(mean))]
+
+g2<-merge(g2,gmean, key="condition")
+
+#write.csv(g2,'tables/appendix1_type1error_gender.csv')
+
+```
+
+# type 1 error rate for interaction type 1 error 
+```{r}
+
+# read the data 
+s<-read.csv('type1error/beta3.csv')
+
+
+#sib2, sib3, MLM4 MLM 6
+
+
+# sib 2
+
+# take only what we need
+
+s<-s[,grep("coef|condition|beta|ICC|CN",names(s))]
+sib2<- s[,grep("sib2|condition|beta|ICC|CN",names(s))]
+
+inmean<-mean[,grep("condition|nx|fx", names(mean))]
+
+sib2mean<-inmean[,grep("condition|sib2", names(inmean))]
+
+
+sib2<-sib2 %>%
+  filter(if_any(starts_with("coef"), ~.>= 0.075) |if_any(starts_with("coef"), ~.<= 0.025))
+
+
+sib2<-merge(sib2,sib2mean,key="condition")
+                
+#write.csv(sib2, file="tables/type1error_interaction_sib2.csv")
+
+# sib3
+
+
+
+# take only what we need 
+sib3<- s[,grep("sib3|condition|beta|ICC|CN",names(s))]
+
+sib3<-sib3 %>%
+  filter(if_any(starts_with("coef"), ~.>= 0.075) |if_any(starts_with("coef"), ~.<= 0.025))
+
+
+sib3mean<-inmean[,grep("condition|sib3", names(inmean))]
+sib3<-merge(sib3,sib3mean,key="condition")
+
+#write.xlsx(sib3, sheetName="sheet1", file="tables/type1error_interaction_sib3.xlsx")
+
+# MLM4
+
+#take only what we need 
+
+MLM4<- s[,grep("MLM4|condition|beta|ICC|CN",names(s))]
+
+MLM4<-MLM4 %>%
+  filter(if_any(starts_with("coef"), ~.>= 0.075) |if_any(starts_with("coef"), ~.<= 0.025))
+
+
+MLM4mean<-inmean[,grep("condition|MLM4", names(inmean))]
+MLM4<-merge(MLM4,MLM4mean,key="condition")
+
+
+
+#write.xlsx(MLM4, sheetName="sheet1", file="tables/type1error_interaction_MLM4.xlsx")
+
+# MLM6 
+# take only what we need 
+
+
+MLM6<- s[,grep("MLM6|condition|beta|ICC|CN",names(s))]
+
+MLM6<-MLM6 %>%
+  filter(if_any(starts_with("coef"), ~.>= 0.075) |if_any(starts_with("coef"), ~.<= 0.025))
+
+
+
+MLM6mean<-inmean[,grep("condition|MLM6", names(inmean))]
+MLM6mean<-MLM6mean[,-grep("df", names(MLM6mean))]
+
+MLM6<-merge(MLM6,MLM6mean,key="condition")
+
+
+#write.xlsx(MLM6, sheetName="sheet1", file="tables/type1error_interaction_MLM6.xlsx")
+```
+
+## table for power
+
+```{r}
+
+# we only get the info of sig rate for MLM4, where there is interaction effect! 
+
+p<-read.csv('type1error/MLM4_sig_rate.csv')
+
+p <- p %>%
+  filter(beta3 !=0)
+
+
+```
+
+# table for overfitting problem
+
+```{r}
+# read the data 
+ov<-read.csv('appendix/singularity_with_psuedoICC.csv')
+# digits 
+options(scipen=999)
+# tale when the singurarity rate is 100 % 
+ov<-ov %>%
+    filter(if_any(starts_with("singularity"), ~.==1))
+
+#write.xlsx(ov, sheetName="sheet1", file='appendix/singularity100ICC.xlsx')
+
+```
+
+# plots for type 1 error rate
+
+## Data management 
+```{R}
+
+beta3<-read.csv("type1error/beta3.csv")
+beta3$X<-NULL
+beta3$beta3_factor<-as.factor(beta3$beta3)
+beta3$beta2_factor<-as.factor(beta3$beta2)
+beta3$ICC_factor<-as.factor(beta3$ICC)
+beta3$CN_factor<-as.factor(beta3$CN)
+
+beta3_long <- beta3 %>%
+  pivot_longer( cols=-c("beta1","condition","beta2","beta3","ICC","CN","beta2_factor",
+                        "beta3_factor","ICC_factor","CN_factor"),
+    names_to = c('coef', 'model1'),
+               names_sep = '(?<=_p_)')
+
+beta3_long<-beta3_long %>%
+  mutate(model = case_when(
+    model1=="sib0"~"REG0",
+    model1=="sib1"~"REG1",
+    model1=="sib2"~"REG2",
+    model1=="sib3"~"REG3",
+    model1=="MLM0"~"MLM0",
+    model1=="MLM1"~"MLM1",
+    model1=="MLM2"~"MLM2",
+    model1=="MLM3"~"MLM3",
+    model1=="MLM4"~"MLM4",
+    model1=="MLM5"~"MLM5",
+    model1=="MLM6"~"MLM6"
+  ))
+
+
+
+beta3_list <- beta3_long %>% 
+  group_split(model)
+
+MLM4<-beta3_list[[2]]
+MLM6<-beta3_list[[3]]
+
+reg2<-beta3_list[[4]]
+reg3<-beta3_list[[5]]
+
+```
+## Reg2 interaction type1 error rate
+```{r}
+
+
+  reg2_type1<-ggplot(reg2, 
+            aes(y= value, 
+                x= coef,
+                colour=beta2_factor) 
+  )+
+    geom_point(alpha=0.4, size=5) +
+     facet_grid(ICC~CN,
+                     labeller="label_both")  +
+   scale_colour_brewer(palette="OrRd") +
+    
+    theme(panel.background= element_rect(fill = "grey"),axis.title.x=element_blank(),
+          axis.title.y=element_blank()
+          )+
+    geom_hline(yintercept=0.025, linetype="dashed")+
+   geom_hline(yintercept=0.075, linetype="dashed")+
+    labs(colour="beta2")+
+    scale_x_discrete("coef",
+                     labels=c("coef_con_diffxgender_composition_two_eff_p_"= TeX("$\\beta_{5}$"))
+                     )
+
+library(apaTables)
+reg2$ICC_factor <- relevel(as.factor(reg2$ICC_factor), ref="0.2")
+reg2$beta2_factor <- relevel(as.factor(reg2$beta2_factor), ref="0")
+reg2$CN_factor <- relevel(as.factor(reg2$CN_factor), ref="30")
+
+reg2lm<-lm(value~CN_factor+beta2_factor+ICC_factor,reg2)
+reg21s<-summary(reg2lm)
+round(reg21s[["coefficients"]],digits=2)
+print(summary(reg2lm)$coefficients,digits=1)
+apa.reg.table(reg2lm,filename="sib2model_interaction_type1_regressio.doc")
+```
+
+## Reg3 type 1 error rate of interaction
+
+```{r}
+
+
+  reg3_type1<-ggplot(reg3, 
+            aes(y= value, 
+                x= coef,
+                colour=beta2_factor) 
+  )+
+    geom_point(alpha=0.4, size=5) +
+     facet_grid(ICC~CN,
+                     labeller="label_both")  +
+   scale_colour_brewer(palette="OrRd") +
+    
+    theme(panel.background= element_rect(fill = "grey"),axis.title.x=element_blank(),
+          axis.title.y=element_blank()
+          )+
+       geom_hline(yintercept=0.025, linetype="dashed")+
+   geom_hline(yintercept=0.075, linetype="dashed")+
+    labs(colour="beta2")+
+    scale_x_discrete("coef",
+                     labels=c("coef_con_diffxev1_p_"= TeX("$\\beta_{6}$"),
+                              "coef_con_diffxev2_p_"= TeX("$\\beta_{7}$")
+                                                          ))
+                    
+reg3$ICC_factor <- relevel(as.factor(reg3$ICC_factor), ref="0.2")
+reg3$beta2_factor <- relevel(as.factor(reg3$beta2_factor), ref="0")
+reg3$CN_factor <- relevel(as.factor(reg3$CN_factor), ref="30")
+
+reg3lm<-lm(value~CN_factor+beta2_factor+ICC_factor,reg3)
+round(summary(reg3lm)[["coefficients"]],digits=2)
+print(summary(reg3lm)$coefficients,digits=2)
+apa.reg.table(reg3lm,filename="sib3model_interaction_type1_regressio.doc")
+```
+###type 1 error plot for mlm 4
+
+```{r}
+
+
+
+  MLM4_type1<-ggplot(MLM4, 
+            aes(y= value, 
+                x= coef,
+                colour=beta2_factor) 
+  )+
+    geom_point(alpha=0.4, size=5) +
+     facet_grid(ICC~CN,
+                     labeller="label_both")  +
+   scale_colour_brewer(palette="OrRd") +
+    
+    theme(panel.background= element_rect(fill = "grey"),axis.title.x=element_blank(),
+          axis.title.y=element_blank()
+          )+
+    geom_hline(yintercept=0.025, linetype="dashed")+
+   geom_hline(yintercept=0.075, linetype="dashed")+
+    labs(colour="beta2")+
+    scale_x_discrete("coef",
+                     labels=c("coef_fixed_conxcatbtw_p_"= TeX("$\\gamma_{11}$"))
+                     )
+  MLM4_type1
+```
+
+### type 1 error rate of MLM6
+```{r}
+
+  MLM6_type1<-ggplot(MLM6, 
+            aes(y= value, 
+                x= coef,
+                colour=beta2_factor) 
+  )+
+    geom_point(alpha=0.4, size=5) +
+     facet_grid(ICC~CN,
+                     labeller="label_both")  +
+   scale_colour_brewer(palette="OrRd") +
+    
+    theme(panel.background= element_rect(fill = "grey"),axis.title.x=element_blank(),
+          axis.title.y=element_blank()
+          )+
+       geom_hline(yintercept=0.025, linetype="dashed")+
+   geom_hline(yintercept=0.075, linetype="dashed")+
+    labs(colour="beta2")+
+    scale_x_discrete("coef",
+                     labels=c("coef_fixed_conxev1_p_"= TeX("$\\gamma_{11}$"),
+                              "coef_fixed_conxev2_p_"= TeX("$\\gamma{12}$")
+                                                          ))
+            
+                
+MLM6$ICC_factor <- relevel(as.factor(MLM6$ICC_factor), ref="0.2")
+MLM6$beta2_factor <- relevel(as.factor(MLM6$beta2_factor), ref="0")
+MLM6$CN_factor <- relevel(as.factor(MLM6$CN_factor), ref="30")
+
+MLM6lm<-lm(value~CN_factor+beta2_factor+ICC_factor,MLM6)
+round(summary(MLM6lm)[["coefficients"]],digits=2)
+print(summary(MLM6lm)$coefficients,digits=2)
+apa.reg.table(MLM6lm,filename="MLM6model_interaction_type1_regressio.doc")
+
+MLM6_type1
+```
+
+## power plot (MLM4)
+
+## Datamanagement
+
+
+## load the data
+
+```{r data}
+
+sig_rate<-read.csv("type1error/sig_rate_with_conditions.csv")
+
+```
+
+
+```{r cleaning}
+# 
+sig_rate$X<-NULL
+sig_rate$X.1<-NULL
+
+
+
+sig_rate$beta2_factor<-as.factor(sig_rate$beta2)
+sig_rate$beta3_factor<-as.factor(sig_rate$beta3)
+sig_rate$ICC_factor<-as.factor(sig_rate$ICC)
+sig_rate$CN_factor <- as.factor(sig_rate$CN)
+
+
+
+### data reshaping for plotting  for 0.05 alpha 
+
+# wide to long 
+sig_rate_long<-sig_rate%>%
+  pivot_longer( cols=-c("beta1","condition","beta2","beta3","ICC","CN",
+                        "beta2_factor","beta3_factor","ICC_factor","CN_factor"),
+    names_to = c('coef', 'model1'),
+               names_sep = '(?<=_p_)')
+
+
+sig_rate_long<-sig_rate_long %>%
+  mutate(model = case_when(
+    model1=="sib0" ~ "REGNTW",
+    model1=="sib1" ~ "REGNTH",
+    model1=="sib2" ~ "REGYTW",
+    model1=="sib3" ~ "REGYTH",
+    model1=="MLM0" ~ "MLM0",
+    model1=="MLM1" ~ "MLMNID",
+    model1=="MLM2" ~ "MLMYID",
+    model1=="MLM3" ~ "MLMNTW",
+    model1=="MLM4" ~ "MLMYTW",
+    model1=="MLM5" ~ "MLMNTH",
+    model1=="MLM6" ~ "MLMYTH"
+  ))
+
+
+
+sig_rate_long <- sig_rate_long %>%
+  mutate(
+    correspond = case_when(
+      coef=="coef_con_diff_p_" ~ "edu_within",
+      coef=="coef_con_diffxev1_p_" ~ "interaction",
+      coef=="coef_con_diffxev2_p_" ~ "interaction",
+      coef=="coef_con_diffxgender_composition_two_eff_p_" ~ "interaction",
+      coef=="coef_con_mean_p_" ~ "edu_between",
+      coef=="coef_ev1_p_" ~ "gender_between",
+      coef=="coef_ev2_p_" ~ "gender_between",
+      coef=="coef_fixed_catbtw_p_" ~ "gender_between",
+      coef=="coef_fixed_catwtn_p_" ~ "gender_within",
+      coef=="coef_fixed_catwtnxcon_p_"  ~ "interaction",
+      coef=="coef_fixed_con_p_" ~ "edu_within",
+      coef=="coef_fixed_conxcatbtw_p_" ~ "interaction",
+      coef=="coef_fixed_conxev1_p_" ~ "interaction",
+      coef=="coef_fixed_conxev2_p_" ~ "interaction",
+      coef=="coef_fixed_ev1_p_" ~ "gender_between",
+      coef=="coef_fixed_ev2_p_" ~ "gender_between",
+      coef=="coef_fixed_Intercept_p_" ~ "intercept",
+      coef=="coef_gender_composition_two_eff_p_"~"gender_between",
+      coef=="coef_intercept_p_" ~ "intercept",
+      coef=="coef_y_mean_p_" ~ "health_between",
+      coef=="f_p_" ~ "F_test_dyadic"
+    )
+  )
+
+
+
+
+sig_rate_long2_interaction <- sig_rate_long %>%
+  mutate(
+    correspond = case_when(
+      
+      coef=="coef_con_diffxev1_p_" ~ "edudiffxinteraction_ev1",
+      coef=="coef_con_diffxev2_p_" ~ "edudiffxinteraction_ev2",
+      coef=="coef_con_diffxgender_composition_two_eff_p_" ~ "edu_diffxgendercomposition_two",
+     
+      coef=="coef_fixed_catwtnxcon_p_"  ~ "education_genderwithin",
+      
+      coef=="coef_fixed_conxcatbtw_p_" ~ "eduxgendercomposition_two",
+      coef=="coef_fixed_conxev1_p_" ~ "eduxinteraction_ev1",
+      coef=="coef_fixed_conxev2_p_" ~ "edudiffxinteraction_ev2",
+      TRUE ~ NA_character_
+      
+    )
+  )
+
+
+# I tried to draw big giant plot, but r says thare are restrictions ( maximum number of points/ maximum number of levels) so, let's split a data. that's not an ideal way to do so, but R is not not perfect
+
+## by sample size 
+sig_rate_long_CN30<- sig_rate_long %>%
+  subset(CN==30)
+sig_rate_long_CN120<- sig_rate_long %>%
+  subset(CN==120)
+sig_rate_long_CN510<- sig_rate_long %>%
+  subset(CN==510)
+
+
+
+# by corresponds 
+
+sig_rate_long_edu_between<- sig_rate_long %>%
+  subset(correspond=="edu_between")
+sig_rate_long_edu_within<- sig_rate_long %>%
+  subset(correspond=="edu_within")
+sig_rate_long_F_test_dyadic<- sig_rate_long %>%
+  subset(correspond=="F_test_dyadic")
+sig_rate_long_gender_between<- sig_rate_long %>%
+  subset(correspond=="gender_between")
+sig_rate_long_gender_within<- sig_rate_long %>%
+  subset(correspond=="gender_within")
+sig_rate_long_health_between<- sig_rate_long %>%
+  subset(correspond=="health_between")
+sig_rate_long_interaction<- sig_rate_long %>%
+  subset(correspond=="interaction")
+sig_rate_long_intercept<- sig_rate_long %>%
+  subset(correspond=="intercept")
+
+#closer compare for interaction effect 
+
+
+```
+
+```{r}
+
+
+sig_rate9 <- sig_rate %>%
+  subset( beta3!=0)
+
+  
+ ggplot(sig_rate9, aes(y= coef_fixed_conxcatbtw_p_MLM4, 
+                          x= ICC, 
+                          colour = beta3_factor, 
+                          size = beta2))+
+        geom_point(alpha=0.45) +
+       labs(colour="beta3")+
+          facet_wrap(~CN, labeller="label_both") +
+   scale_colour_brewer(palette="OrRd") + 
+      ylab("MLM4")+
+  scale_size_continuous(breaks=c(0,0.1,0.3,0.5)) +
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")
+   
+ 
+
+```
+# APPENdix  ( the sig rate of the parameters)
+
+The sig rate of parameters (under 0.05 alpha level) were plotted, according to the parameters (the parameters that corresponds to either education effect, gender effect, or interaction effect)
+
+
+```{r}
+
+## edu-between
+  ggplot(sig_rate_long_edu_between, 
+             aes(y= value, x= model, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+     facet_grid(ICC~CN, labeller="label_both") +
+   scale_colour_brewer(palette="OrRd") + 
+  labs(colour="beta3")+
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 70, hjust=1))+
+  theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank())+
+   scale_size_continuous(breaks=c(0,0.1,0.3,0.5)) +
+  theme(plot.margin = margin(0.6, 0.6, 0.6, 0.6, "cm")) +
+  ggtitle("Between-dyad effects of education")
+  
+```
+
+```{r}
+
+# edu_within
+
+
+ggplot(sig_rate_long_edu_within, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+           facet_grid(ICC~CN, labeller="label_both") +
+  labs(colour="beta3")+
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 70, hjust=1))+
+     scale_size_continuous(breaks=c(0,0.1,0.3,0.5)) +
+  theme(plot.margin = margin(0.6, 0.6, 0.6, 0.6, "cm")) +
+   theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank())+
+  ggtitle("Within-dyad effect of education")
+
+# f-test for dyadic regression
+
+ggplot(sig_rate_long_F_test_dyadic, 
+             aes(y= value, 
+                 x= model,
+                  
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+            facet_grid(ICC~CN, labeller="label_both") +
+   labs(colour="beta3")+
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75,  hjust=1))+
+   scale_size_continuous(breaks=c(0,0.1,0.3,0.5)) +
+  theme(plot.margin = margin(0.6, 0.6, 0.6, 0.6, "cm")) +
+   theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank())+
+  ggtitle("p-value for the F-test in regression")
+
+# gender_Between 
+ggplot(sig_rate_long_gender_between, 
+             aes(y= value, x= model, 
+                  
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+   labs(colour="beta3")+
+          facet_grid(ICC~CN, labeller="label_both") +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75,  hjust=1))+
+   scale_size_continuous(breaks=c(0,0.1,0.3,0.5)) +
+  theme(plot.margin = margin(0.6, 0.6, 0.6, 0.6, "cm")) +
+   theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank())+
+  ggtitle("Gender-composition effects")
+
+
+#gender_within
+
+ggplot(sig_rate_long_gender_within, 
+             aes(y= value, x= model, 
+                  
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+           facet_grid(ICC~CN, labeller="label_both") +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75,  hjust=1))+
+   labs(colour="beta3")+
+   scale_size_continuous(breaks=c(0,0.1,0.3,0.5)) +
+  theme(plot.margin = margin(0.6, 0.6, 0.6, 0.6, "cm")) +
+   theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank())+
+  ggtitle("Individual gender effect")
+
+# interaction 
+ggplot(sig_rate_long_interaction, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_grid(ICC~CN, labeller="label_both") +
+   scale_colour_brewer(palette="OrRd") + 
+   labs(colour="beta3")+
+    theme(panel.background= element_rect(fill = "grey"),axis.title.x=element_blank(),
+          axis.title.y=element_blank()
+          ) +
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, hjust=1))+
+  theme(plot.margin = margin(0.6, 0.6, 0.6, 0.6, "cm")) +
+   scale_size_continuous(breaks=c(0,0.1,0.3,0.5)) +
+   theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank())+
+  ggtitle("Interaction effect")
+
+```
+
+
+### Apendix
+
+```{r}
+
+sig_rate<-read.csv('type1error/sig_rate.csv')
+
+condition <-read.csv('conditions/Conditions_summary.csv')
+condition <- condition[,grep("cn|ICC|beta|condition",names(condition))]
+sig_rate<-sig_rate[,grep("con|ev|gender|catwtn|condition|catbtw",names(sig_rate))]
+sig_rate<-sig_rate[,-grep("mean",names(sig_rate))]
+
+Ap_sig<-merge(condition,sig_rate, key="condition")
+#write.csv(Ap_sig, 'tables/appendix_sig_rate.csv')
+
+reg_sig_rate<-Ap_sig[,grep("sib|condition|CN|beta|ICC|catbtw",names(Ap_sig))]
+reg_sig_rate<-round(reg_sig_rate,digits=2)
+#write.csv(reg_sig_rate, 'tables/appendix_sig_rate_reg.csv')
+
+
+mlm_sig_rate<-Ap_sig[,grep("MLM|condition|CN|beta|ICC|catbtw",names(Ap_sig))]
+mlm_sig_rate<-round(mlm_sig_rate,digits=2)
+#write.csv(mlm_sig_rate, 'tables/appendix_sig_rate_MLM.csv')
+
+```
