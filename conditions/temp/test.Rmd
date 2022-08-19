@@ -1,0 +1,707 @@
+---
+title: "Test"
+author: "Yoo Ri Hwang"
+date: '2022-06-17'
+output: html_document
+---
+
+## package
+
+```{r}
+
+library(tidyverse)
+
+```
+
+## two continuous variable
+
+### not-weighted 
+
+```{r}
+
+
+math_bet<-rep(rnorm(998/2,0,1),each=2)
+history_bet<-rep(rnorm(998/2,0,1),each=2)
+math_wtn_1<-rnorm(998,0,1)
+history_wtn_1<-rnorm(998,0,1)
+math_wtn_2<-rnorm(998,0,1)
+history_wtn_2<-rnorm(998,0,1)
+
+data<-data.frame(math_bet, history_bet, math_wtn_1, history_wtn_1, math_wtn_2, history_wtn_2)
+
+data <- data %>%
+  mutate(
+    pid=rep(1:499,each=2),
+    math_1 = math_bet + math_wtn_1,
+    math_2 = math_bet + math_wtn_2,
+    history_1 = history_bet + history_wtn_1,
+    history_2 = history_bet + history_wtn_2,
+    y_1 = history_1 + math_1,
+    y_2 = history_2 + math_2,
+    y_1w = history_1 + 5*math_1,
+    y_2w = history_2 + 5*math_2
+  )
+
+
+data <- data %>%
+  dplyr::mutate(higher_one_y = case_when(
+    y_1>y_2~"1",
+    y_1<y_2~"2",
+    y_1==y_2~"equal")
+  )
+
+## subset
+
+# randomly assign tie siblings
+p <- stats::rbinom(1,1,0.5)
+
+data[data$higher_one=="equal",]<-ifelse(p==0,"1","2")
+
+# splice the data
+
+dat1<-data[data$higher_one=="1",]
+dat2<-data[data$higher_one=="2",]
+
+# change the column names
+data<- data %>%
+  dplyr::mutate(y_2_1=y_2,
+                y_1_2=y_1,
+                math_1_2=math_1,
+                math_2_1=math_2,
+                history_1_2=history_1,
+                history_2_1=history_2
+  ) %>%
+  subset(
+    select=-c(y_1,
+              y_2,
+              math_1,
+              math_2,
+              history_1,
+              history_2
+    )
+  ) %>%
+  dplyr::rename(y_1=y_2_1,
+                y_2=y_1_2,
+                math_2=math_1_2,
+                math_1=math_2_1,
+                history_2=history_1_2,
+                history_1=history_2_1)
+
+dat3<-rbind(dat1,dat2)
+
+# calculate mean score and difference score
+
+dat3<-dat3 %>%
+  dplyr::mutate(
+    math_mean = (math_1+math_2)/2,
+    math_diff = math_1-math_2,
+    history_mean = (history_1+history_2)/2,
+    history_diff = history_1-history_2,
+    diff_interaction = math_diff*history_diff,
+    y_mean = (y_1+y_2)/2,
+    y_diff = y_1-y_2
+  )
+
+dat3$higher_one <- NULL
+
+con_unweighted<-lm(y_diff ~ y_mean + math_mean + math_diff + history_mean + history_diff:math_diff, data = dat3)
+summary(con_unweighted)
+
+con_unweighted<-lm(y_diff ~  math_mean + math_diff + history_mean + history_diff:math_diff, data = dat3)
+summary(con_unweighted)
+
+corr <- dat3 %>%
+  dplyr::select(y_diff,y_mean, math_mean, math_diff, history_mean, history_diff, diff_interaction)
+
+cor(corr)
+
+
+
+```
+
+### weigted version
+
+```{r}
+
+
+math_bet<-rep(rnorm(998/2,0,1),each=2)
+history_bet<-rep(rnorm(998/2,0,1),each=2)
+math_wtn_1<-rnorm(998,0,1)
+history_wtn_1<-rnorm(998,0,1)
+math_wtn_2<-rnorm(998,0,1)
+history_wtn_2<-rnorm(998,0,1)
+
+data2<-data.frame(math_bet, history_bet, math_wtn_1, history_wtn_1, math_wtn_2, history_wtn_2)
+
+data2 <- data2 %>%
+  mutate(
+    pid=rep(1:499,each=2),
+    math_1 = math_bet + math_wtn_1,
+    math_2 = math_bet + math_wtn_2,
+    history_1 = history_bet + history_wtn_1,
+    history_2 = history_bet + history_wtn_2,
+    y_1 = history_1 + 5*math_1,
+    y_2 = history_2 + 5*math_2
+   
+  )
+
+
+data2 <- data2 %>%
+  dplyr::mutate(higher_one_y = case_when(
+    y_1>y_2~"1",
+    y_1<y_2~"2",
+    y_1==y_2~"equal")
+  )
+
+## subset
+
+# randomly assign tie siblings
+p <- stats::rbinom(1,1,0.5)
+
+data2[data2$higher_one=="equal",]<-ifelse(p==0,"1","2")
+
+# splice the data
+
+dat1<-data2[data2$higher_one=="1",]
+dat2<-data2[data2$higher_one=="2",]
+
+# change the column names
+data2<- data2 %>%
+  dplyr::mutate(y_2_1=y_2,
+                y_1_2=y_1,
+                math_1_2=math_1,
+                math_2_1=math_2,
+                history_1_2=history_1,
+                history_2_1=history_2
+  ) %>%
+  subset(
+    select=-c(y_1,
+              y_2,
+              math_1,
+              math_2,
+              history_1,
+              history_2
+    )
+  ) %>%
+  dplyr::rename(y_1=y_2_1,
+                y_2=y_1_2,
+                math_2=math_1_2,
+                math_1=math_2_1,
+                history_2=history_1_2,
+                history_1=history_2_1)
+
+dat3<-rbind(dat1,dat2)
+
+# calculate mean score and difference score
+
+dat3<-dat3 %>%
+  dplyr::mutate(
+    math_mean = (math_1+math_2)/2,
+    math_diff = math_1-math_2,
+    history_mean = (history_1+history_2)/2,
+    history_diff = history_1-history_2,
+    diff_interaction = math_diff*history_diff,
+    y_mean = (y_1+y_2)/2,
+    y_diff = y_1-y_2
+  )
+
+dat3$higher_one <- NULL
+
+con_weighted<-lm(y_diff ~ y_mean + math_mean + math_diff + history_mean + history_diff:math_diff, data2 = dat3)
+summary(con_unweighted)
+
+corr <- dat3 %>%
+  dplyr::select(y_diff,y_mean, math_mean, math_diff, history_mean, history_diff, diff_interaction)
+
+cor(corr)
+
+```
+
+## categorical variable
+
+### not weighted 
+
+```{r}
+
+con_vcovmatrix=matrix(c(1,0,0,0,
+                                            0,1,0,1,
+                                            0,0,1,0,
+                                            0,1,0,1),
+                                          nrow = 4,
+                                          byrow = TRUE,
+                                          dimnames = list(c("con_wtn_1","con_btw_1","con_wtn_2","con_btw_2"),
+                                                          c("con_wtn_1","con_btw_1","con_wtn_2","con_btw_2")))
+
+ con_mu=c(0,0,0,0)
+ dat <- MASS::mvrnorm(500, # cluster  number
+                       mu = con_mu, # Mu
+                       Sigma = con_vcovmatrix)%>% # Covariance matrix
+    as.data.frame() 
+ 
+ dat<-dat %>%
+    mutate(
+      pid = 1:500,
+      con_1 = con_wtn_1 +  con_btw_1,
+      con_2 =  con_wtn_2 + con_btw_2,
+     
+      catwtn_1 = sample(rep(c(-1, 1), 250)),
+      catwtn_2 = sample(rep(c(-1, 1), 250)),
+     
+      catbtw_1 = case_when(
+        catwtn_1 == 1 & catwtn_2 == 1 ~ 1,
+        catwtn_1 == 1 & catwtn_2 == -1 ~ -1,
+        catwtn_1 == -1 & catwtn_2 == 1 ~ -1,
+        catwtn_1 == -1 & catwtn_2 == -1 ~ 1,
+      ),
+      catbtw_2 = catbtw_1,
+
+      cat_1 =  catbtw_1 +  catwtn_1,
+      cat_2 =  catbtw_2 +  catwtn_2,
+
+      y_1 = con_1 + cat_1,
+      y_2 = con_2 + cat_2) 
+ 
+ ## reconstruct 
+ source('C:/data/GitHub/thesis_yrh/scripts/reconstruct.R')
+ 
+ dat<-reconstruct(dat)
+ 
+```
+
+```{r}
+
+two_unw<-lm(y_diff~y_mean + con_diff + con_mean + gender_composition_two_eff+ gender_composition_two_eff:con_diff, dat)
+
+dat$gender_twoxcondiff<-dat$gender_composition_two_eff*dat$con_diff
+summary(two_unw)
+
+
+two_unw<-lm(y_diff~y_mean + con_diff + con_mean + gender_composition_two_eff, dat)
+dat$gender_twoxcondiff<-dat$gender_composition_two_eff*dat$con_diff
+summary(two_unw)
+
+
+
+dat$gender_twoxcondiff<-dat$gender_composition_two_eff*dat$con_diff
+
+
+
+corr <- dat  %>%
+  dplyr::select(y_diff,y_mean,con_diff, con_mean, gender_composition_two_eff, gender_twoxcondiff)
+
+dat$gender_composition_two_eff<-as.numeric(dat$gender_composition_two_eff)
+cor(corr)
+
+
+
+two_unw<-lm(y_diff ~ gender_composition_two_eff:con_diff, dat)
+
+summary(two_unw)
+
+
+
+two_unw<-lm(y_diff ~ con_diff, dat)
+
+summary(two_unw)
+
+
+two_unw<-lm(y_diff ~ gender_composition_two_eff, dat)
+
+summary(two_unw)
+
+two_unw<-lm(y_diff ~ gender_composition_two_eff+con_diff, dat)
+
+summary(two_unw)
+
+
+
+
+
+
+two_unw<-lm(y_diff ~ con_diff+gender_composition_two_eff:con_diff, dat)
+
+summary(two_unw)
+
+
+two_unw<-lm(y_diff ~ gender_composition_two_eff+gender_composition_two_eff:con_diff, dat)
+
+summary(two_unw)
+
+
+two_unw<-lm(y_diff ~ gender_composition_two_eff+con_diff+gender_composition_two_eff:con_diff, dat)
+
+summary(two_unw)
+
+car::vif(two_unw)
+
+dat<-dat[,grep("pid|mean|diff|eff",names(dat))]
+
+#define intercept-only model
+intercept_only <- lm(y_diff ~ 1, dat)
+
+#define model with all predictors
+all <- lm(y_diff ~ ., dat)
+
+#perform backward stepwise regression
+both <- step(intercept_only, direction='both', scope=formula(all))
+
+
+## get varialce from con_diff
+## puting interaction term make mor significant the certian variable (con_diff/gender composition)
+# r^2 goes down 
+
+ggplot(dat,aes(x=con_diff, y=y_diff))+
+  geom_point()
+
+
+ggplot(dat,aes(x=gender_composition_two_eff, y=y_diff))+
+  geom_point()
+
+
+ggplot(dat,aes(x=gender_twoxcondiff, y=y_diff))+
+  geom_point()
+
+
+ggplot(dat,aes(x=gender_composition_two_eff, y=gender_twoxcondiff))+
+  geom_point()
+
+
+ggplot(dat,aes(x=con_diff, y=gender_twoxcondiff))+
+  geom_point()
+
+
+two_unw<-lm(y_diff ~ gender_composition_two_eff+con_diff, dat)
+
+summary(two_unw)
+
+# mixed DV=1.09+0.73x+0.76
+# same DV=1.09+0.73x-0.76
+
+equation1=function(x){coef(two_unw)[1]+coef(two_unw)[2]+coef(two_unw)[3]*x}
+
+equation2=function(x){coef(two_unw)[1]-coef(two_unw)[2]+coef(two_unw)[3]*x}
+
+dat$gender_composition_two_eff<-as.factor(dat$gender_composition_two_eff)
+
+ggplot(dat,aes(y=y_diff,x=con_diff,color=gender_composition_two_eff))+
+         geom_point()+
+        stat_function(fun=equation1,geom="line",color=scales::hue_pal()(2)[1])+
+        stat_function(fun=equation2,geom="line",color=scales::hue_pal()(2)[2])+
+        xlab("x")+ylab("y")+labs(color="gender")
+
+ggplot(dat,aes(y=y_diff,x=con_diff,color=gender_composition_two_eff))+
+         geom_point()
+
+
+ggplot(dat,aes(y=y_diff,x=gender_twoxcondiff,color=gender_composition_two_eff))+
+         geom_point()
+
+
+ggplot(dat,aes(y=y_diff,x=con_diff,color=gender_composition_two_eff))+
+         geom_point()
+
+dat2<-dat
+dat2$gender<-dat2$gender_composition_two_eff 
+dat2$x<-dat2$con_diff
+dat2$y<-dat2$y_diff
+
+summary(lm(y~x+gender+x:gender,dat2))
+summary(lm(y_diff~con_diff + gender_composition_two_eff+gender_twoxcondiff,dat))
+
+```
+## when there is no main effect and only interaction effect (does not make sense)
+
+```{r}
+
+con_vcovmatrix=matrix(c(1,0,0,0,
+                                            0,1,0,1,
+                                            0,0,1,0,
+                                            0,1,0,1),
+                                          nrow = 4,
+                                          byrow = TRUE,
+                                          dimnames = list(c("con_wtn_1","con_btw_1","con_wtn_2","con_btw_2"),
+                                                          c("con_wtn_1","con_btw_1","con_wtn_2","con_btw_2")))
+
+ con_mu=c(0,0,0,0)
+ dat <- MASS::mvrnorm(500, # cluster  number
+                       mu = con_mu, # Mu
+                       Sigma = con_vcovmatrix)%>% # Covariance matrix
+    as.data.frame() 
+ 
+ dat<-dat %>%
+    mutate(
+      pid = 1:500,
+      con_1 = con_wtn_1 +  con_btw_1,
+      con_2 =  con_wtn_2 + con_btw_2,
+     
+      catwtn_1 = sample(rep(c(-1, 1), 250)),
+      catwtn_2 = sample(rep(c(-1, 1), 250)),
+     
+      catbtw_1 = case_when(
+        catwtn_1 == 1 & catwtn_2 == 1 ~ 1,
+        catwtn_1 == 1 & catwtn_2 == -1 ~ -1,
+        catwtn_1 == -1 & catwtn_2 == 1 ~ -1,
+        catwtn_1 == -1 & catwtn_2 == -1 ~ 1,
+      ),
+      catbtw_2 = catbtw_1,
+
+      cat_1 =  catbtw_1 +  catwtn_1,
+      cat_2 =  catbtw_2 +  catwtn_2,
+
+      y_1 = con_1 * cat_1,
+      y_2 = con_2 * cat_2) 
+ 
+ dat<-dat %>%
+  mutate(across(everything(), as.numeric))
+ 
+ data<-dat
+ 
+ 
+  data <- data %>%
+    dplyr::mutate(higher_one = case_when(
+      y_1>y_2~"1",
+      y_1<y_2~"2",
+      y_1==y_2~"equal")
+    )
+
+  ## subset
+
+  # randomly assign tie siblings
+  p <- stats::rbinom(1,1,0.5)
+
+  data[data$higher_one=="equal",]<-ifelse(p==0,"1","2")
+
+  # splice the data
+
+  dat1<-data[data$higher_one=="1",]
+  dat2<-data[data$higher_one=="2",]
+
+  # change the column names
+  dat2 <- dat2 %>%
+    dplyr::mutate(y_2_1=y_2,
+                  y_1_2=y_1,
+                  con_1_2=con_1,
+                  con_2_1=con_2,
+                  cat_1_2=cat_1,
+                  cat_2_1=cat_2,
+                  catwtn_1_2=catwtn_1,
+                  catwtn_2_1=catwtn_2
+    ) %>%
+    subset(
+      select=-c(y_1,
+                y_2,
+                con_1,
+                con_2,
+                cat_1,
+                cat_2,
+                catwtn_1,
+                catwtn_2
+      )
+    ) %>%
+    dplyr::rename(y_1=y_2_1,
+                  y_2=y_1_2,
+                  con_2=con_1_2,
+                  con_1=con_2_1,
+                  cat_2=cat_1_2,
+                  cat_1=cat_2_1,
+                  catwtn_1=catwtn_2_1,
+                  catwtn_2=catwtn_1_2)
+
+  dat3<-rbind(dat1,dat2)
+
+  
+ dat3<-dat3%>%
+  mutate(across(everything(), as.numeric))
+  # calculate mean score and difference score
+
+  dat3<-dat3 %>%
+    dplyr::mutate(
+      con_mean = (con_1+con_2)/2,
+      con_diff = con_1-con_2,
+      y_mean = (y_1+y_2)/2,
+      y_diff = y_1-y_2
+    )
+
+  dat3$higher_one <- NULL
+
+  dat3<-dat3 %>%
+    mutate(
+      gender_composition_two=case_when(
+        catwtn_1==catwtn_2 ~ "same-sex",
+        catwtn_1!=catwtn_2 ~ "mixed-sex"),
+
+      gender_composition_three=case_when(
+        catwtn_1==1 & catwtn_2==1 ~ "oneone",
+        catwtn_1==-1 & catwtn_2==-1 ~ "mimi",
+        catwtn_1!=catwtn_2 ~ "mixed"),
+
+      gender_composition_two_eff=case_when(
+        catwtn_1==catwtn_2 ~ 1,
+        catwtn_1!=catwtn_2 ~ -1),
+      # three levels : need two coding variable.
+      ev1 = case_when(catwtn_1==catwtn_2 & catwtn_1==1 ~ 1,
+                      catwtn_1==catwtn_2 & catwtn_1==-1 ~ 0,
+                      catwtn_1!=catwtn_2 ~ -1), # reference
+      ev2 = case_when(catwtn_1==catwtn_2 & catwtn_1==1 ~ 0,
+                      catwtn_1==catwtn_2 & catwtn_1==-1 ~ 1,
+                      catwtn_1!=catwtn_2 ~ -1) # reference
+    )
+
+
+two_unw<-lm(y_diff ~ gender_composition_two_eff+con_diff, dat3)
+summary(two_unw)
+two_unw<-lm(y_diff ~ con_diff, dat3)
+summary(two_unw)
+two_unw<-lm(y_diff ~ gender_composition_two_eff, dat3)
+summary(two_unw)
+
+
+two_unw<-lm(y_diff ~ gender_composition_two_eff+con_diff+gender_composition_two_eff:con_diff, dat3)
+summary(two_unw)
+
+dat3$gender_composition_two <-as.factor(dat3$gender_composition_two )
+
+two_unw<-lm(y_diff ~ gender_composition_two+con_diff, dat3)
+summary(two_unw)
+two_unw<-lm(y_diff ~ con_diff, dat3)
+summary(two_unw)
+two_unw<-lm(y_diff ~ gender_composition_two, dat3)
+summary(two_unw)
+
+two_unw<-lm(y_diff ~ gender_composition_two+con_diff+gender_composition_two:con_diff, dat3)
+summary(two_unw)
+
+
+
+
+# mixed DV=1.09+0.73x+0.76
+# same DV=1.09+0.73x-0.76
+
+equation1=function(x){coef(two_unw)[1]+coef(two_unw)[2]+coef(two_unw)[3]*x}
+
+equation2=function(x){coef(two_unw)[1]+coef(two_unw)[3]*x}
+
+dat3$gender_composition_two_eff<-as.factor(dat3$gender_composition_two_eff)
+
+dat3$gender_composition_two<-as.factor(dat3$gender_composition_two)
+
+ggplot(dat3,aes(y=y_diff,x=con_diff,color=gender_composition_two_eff))+
+         geom_point()+
+        stat_function(fun=equation1,geom="line",color=scales::hue_pal()(2)[1])+
+        stat_function(fun=equation2,geom="line",color=scales::hue_pal()(2)[2])
+       
+
+
+ dat3$gender_composition_two_eff<-as.factor(dat3$gender_composition_two_eff)
+ggplot(dat3,aes(y=y_diff,x=con_diff,color=gender_composition_two_eff))+
+         geom_point()
+
+```
+
+
+```{r}
+
+
+gen_dyadic <- function(full=FALSE,
+                       researcher=FALSE, # true releases only what the researcher would have
+                       cn=120, # Clusternumber
+                       con_mu=c(0,0,0,0), #mean of continuous variable
+                       con_vcovmatrix=matrix(c(1,0,0,0,
+                                            0,1,0,1,
+                                            0,0,1,0,
+                                            0,1,0,1),
+                                          nrow = 4,
+                                          byrow = TRUE,
+                                          dimnames = list(c("con_wtn_1","con_btw_1","con_wtn_2","con_btw_2"),
+                                                          c("con_wtn_1","con_btw_1","con_wtn_2","con_btw_2"))),
+                      con_icc_wtn = .3,
+                      con_icc_btw = .7,
+                      cat_icc_wtn = .3,
+                      cat_icc_btw = .7, # if con/cat things are different, it may cuase some problem in interaction
+                      beta1 = .3, #beta weight for continuous variable on individual regression
+                      beta2 = .3, #beta weight for the categorical variable on individual regression
+                      beta3 = 0 # beta weight for interaction
+
+){
+  ## adjusting between and within variance in continuous variable
+require(MASS)
+require(tidyverse)
+
+
+
+  ## Continuous variable
+  dat <- MASS::mvrnorm(cn, # cluster  number
+                       mu = con_mu, # Mu
+                       Sigma = con_vcovmatrix) %>% # Covariance matrix
+    as.data.frame() %>%
+    mutate(
+      pid = 1:cn, ## id column
+      con_1 = sqrt(con_icc_wtn) * con_wtn_1 + sqrt(con_icc_btw) * con_btw_1,
+      con_2 = sqrt(con_icc_wtn) * con_wtn_2 + sqrt(con_icc_btw) * con_btw_2,
+      ## categorical within
+      catwtn_1 = sample(rep(c(-1, 1), cn / 2)),
+      catwtn_2 = sample(rep(c(-1, 1), cn / 2)),
+      ## categorical between -- we are assumed that mixed sex sibing is beneficial to the health, compared to the
+      ## same-sex siblign. this shold be addressed in limitation.
+      catbtw_1 = case_when(
+        catwtn_1 == 1 & catwtn_2 == 1 ~ 1,
+        catwtn_1 == 1 & catwtn_2 == -1 ~ -1,
+        catwtn_1 == -1 & catwtn_2 == 1 ~ -1,
+        catwtn_1 == -1 & catwtn_2 == -1 ~ 1,
+      ),
+      catbtw_2 = catbtw_1,
+
+      cat_1 = sqrt(cat_icc_btw) * catbtw_1 + sqrt(cat_icc_wtn) * catwtn_1,
+      cat_2 = sqrt(cat_icc_btw) * catbtw_2 + sqrt(con_icc_wtn) * catwtn_2,
+
+      er_1 = rnorm(cn, mean=0, sd=1),
+      er_2 = rnorm(cn, mean=0, sd=1),
+      erbt_1 = rnorm(cn, mean=0, sd=1),
+      erbt_2 = erbt_1,
+
+# individual regression
+# error variance
+# interaction is within level. should be clarified in the manuscripts
+      y_1 = beta1 * con_1 + beta2 * cat_1 + beta3 * sqrt(con_icc_wtn)* con_wtn_1* catwtn_1 ,
+      y_2 = beta1 * con_2 + beta2 * cat_2 + beta3 * sqrt(con_icc_wtn)* con_wtn_2* catwtn_2 ,
+
+    )%>%
+    rename(conwtn_1 = con_wtn_1,
+           conwtn_2 = con_wtn_2)
+if(full){
+  return(dat)
+  } else if(researcher){
+    dat %>%
+      mutate(
+      gender_1 = case_when(
+        catwtn_1 == 1 ~ "male(1)",
+        catwtn_1 == -1 ~ "female(-1)"),
+      gender_2 = case_when(
+        catwtn_2 == 1 ~ "male(1)",
+        catwtn_2 == -1 ~ "female(-1)")) %>%
+      subset(select=c(pid,y_1,y_2,
+                      con_1,con_2,
+                      gender_1,gender_2)) %>%
+  rename(health_1 = y_1,
+         health_2 = y_2,
+         edu_1 = con_1,
+         edu_2 = con_2) %>%
+      return()
+} else {
+  dat %>%
+    subset(select=c(pid,y_1,y_2,
+                    con_1, con_2,
+                    cat_1, cat_2,
+                    catwtn_1, catwtn_2,
+                    catbtw_1, catbtw_2,
+                    conwtn_1, conwtn_2
+                    )) %>%
+  return()
+  }
+  }
+
+
+
+
+```
+

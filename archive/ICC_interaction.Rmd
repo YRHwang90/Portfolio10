@@ -1,0 +1,224 @@
+---
+title: "ICC_interaction"
+author: "Yoo Ri Hwang"
+date: "4/22/2022"
+output: html_document
+---
+For future yoori who wants to extend the master thesis.
+
+
+This project contains how to manipulate ICC whe interaction is
+within level (genderwitnint *edu within)
+between level (genderbetween*edubetween)
+full((genderwith+genderbetween)*(eduwithin+edubetween))
+human level (gender within * edu whole )
+
+
+between*between interaction = between = dyad pair shares the same value
+within *within interaction term = within  = this is independent among two members.4
+
+Yoo Ri's conjecture. ♦
+
+between*within interaction
+= the covariance of this variable : between
+= the left ovef of this variable : within 
+
+```{r}
+
+
+library(MASS)
+library(tidyverse)
+library(lme4)
+```
+
+```{r}
+
+
+
+gen_dyadic <- function(full=FALSE,
+                       researcher=FALSE, # true releases only what the researcher would have (human being's eye)
+                       cn=120, # what is this?
+                       con_mu=c(0,0,0,0), #mean
+                       con_vcovmatrix=matrix(c(1,0,0,0,
+                                            0,1,0,1,
+                                            0,0,1,0,
+                                            0,1,0,1),
+                                          nrow = 4,
+                                          byrow = TRUE,
+                                          dimnames = list(c("con_wtn_1","con_btw_1","con_wtn_2","con_btw_2"),
+                                                          c("con_wtn_1","con_btw_1","con_wtn_2","con_btw_2"))),
+                      con_icc_wtn = .3,
+                      con_icc_btw = .7,
+                      cat_icc_wtn = .3,
+                      cat_icc_btw = .7, # if con/cat things are different, it may cuase some problem in interaction
+                      beta1 = .3, #beta weight for continuous variable on individual regression
+                      beta2 = .3, #beta weight for the categorical variable on individual regression
+                      beta3 = 0 # beta weight for interaction
+
+){
+  ## adjusting between and within variance in continuous variable
+require(MASS)
+require(tidyverse)
+
+
+
+  ## Continuous variable
+  dat <- MASS::mvrnorm(cn, # cluster  number
+                       mu = con_mu, # Mu
+                       Sigma = con_vcovmatrix) %>% # Covariance matrix
+    as.data.frame() %>%
+    mutate(
+      pid = 1:cn, ## id column
+      con_1 = sqrt(con_icc_wtn) * con_wtn_1 + sqrt(con_icc_btw) * con_btw_1,
+      con_2 = sqrt(con_icc_wtn) * con_wtn_2 + sqrt(con_icc_btw) * con_btw_2,
+      ## categorical within
+      catwtn_1 = sample(rep(c(-1, 1), cn / 2)),
+      catwtn_2 = sample(rep(c(-1, 1), cn / 2)),
+      ## categorical between -- we are assumed that mixed sex sibing is beneficial to the health, compared to the
+      ## same-sex siblign. this shold be addressed in limitation.
+      catbtw_1 = case_when(
+        catwtn_1 == 1 & catwtn_2 == 1 ~ -1,
+        catwtn_1 == 1 & catwtn_2 == -1 ~ 1,
+        catwtn_1 == -1 & catwtn_2 == 1 ~ 1,
+        catwtn_1 == -1 & catwtn_2 == -1 ~ -1,
+      ),
+      catbtw_2 = catbtw_1,
+
+      cat_1 = sqrt(cat_icc_btw) * catbtw_1 + sqrt(cat_icc_wtn) * catwtn_1,
+      cat_2 = sqrt(cat_icc_btw) * catbtw_2 + sqrt(con_icc_wtn) * catwtn_2,
+
+      er_1 = rnorm(cn, mean=0, sd=1),
+      er_2 = rnorm(cn, mean=0, sd=1),
+      erbt_1 = rnorm(cn, mean=0, sd=1),
+      erbt_2 = erbt_1,
+
+# individual regression
+# error variance
+# interaction is within level. should be clarified in the manuscripts
+      y_1 = beta1 * con_1 + beta2 * cat_1 + beta3 * sqrt(con_icc_wtn)* con_wtn_1*catwtn_1+ erbt_2 + er_2,
+      y_2 = beta1 * con_2 + beta2 * cat_2 + beta3 * sqrt(con_icc_wtn)* con_wtn_2* catwtn_2 + erbt_2 + er_2,
+    yhuman_1 = beta1 * con_1 + beta2 * cat_1 + beta3 * sqrt(con_icc_wtn)* con_wtn_1* catwtn_1 + beta3*con_btw_1*sqrt(con_icc_btw)*catwtn_1+ erbt_1 + er_1,
+    yhuman_2=beta1 * con_2 + beta2 * cat_2 + beta3 * sqrt(con_icc_wtn)* con_wtn_2* catwtn_2 + beta3*con_btw_1*sqrt(con_icc_btw)*catwtn_2+ erbt_2 + er_2
+
+    )%>%
+    rename(conwtn_1 = con_wtn_1,
+           conwtn_2 = con_wtn_2)
+if(full){
+  return(dat)
+  } else if(researcher){
+    dat %>%
+      mutate(
+      gender_1 = case_when(
+        catwtn_1 == 1 ~ "male",
+        catwtn_1 == -1 ~ "female"),
+      gender_2 = case_when(
+        catwtn_2 == 1 ~ "male",
+        catwtn_2 == -1 ~ "female")) %>%
+      subset(select=c(pid,y_1,y_2,
+                      con_1,con_2,
+                      gender_1,gender_2)) %>%
+  rename(health_1 = y_1,
+         health_2 = y_2,
+         edu_1 = con_1,
+         edu_2 = con_2) %>%
+      return()
+} else {
+  dat %>%
+    subset(select=c(pid,y_1,y_2,
+                    con_1, con_2,
+                    cat_1, cat_2,
+                    catwtn_1, catwtn_2,
+                    catbtw_1, catbtw_2,
+                    conwtn_1, conwtn_2,
+                    yhuman_1,yhuman_2
+                    )) %>%
+  return()
+  }
+  }
+```
+```{R}
+
+dyad2ind<-function(data,
+                   pid=pid){
+require(tidyverse)
+  dat_ind <- data %>%
+    gather(key,value,-pid)%>%
+    separate(key,c("key","indID"),sep="_")%>%
+    spread(key,value)
+
+  return(dat_ind)}
+
+```
+```{r}
+
+
+
+ICC_calculator <- function(
+  beta1,
+  beta2,
+  beta3,
+  ICC,
+  interaction='within',
+
+  # if it is ratio, it is determined by the numbers you put in the within argument
+  within)
+{
+
+  a<-beta1
+  b<-beta2
+  c<-beta3
+  d<-ICC
+  y<-within
+
+  if(interaction=='within'){
+  x <- (1 - d * (a^2 * y + b^2 * y + c^2 * y + 2))/((d - 1) * (a^2 + b^2))
+  }
+  if(interaction=='human'){
+    
+    x <- (1 - d*(a^2 * y + b^2 * y + c^2* y + 2))/((d - 1) * (a^2 + b^2 + c^2))
+  }
+
+ return(x)
+}
+
+
+
+```
+
+# test human interaction 
+```{r}
+ICC_calculator(beta1=0.3, beta2=0.1, beta3=0.1, ICC=0.2,within=100, interaction='human')
+#18.18182
+
+nrep <- 100
+sim_result <- vector ("list", length = nrep)
+icc <- vector("list", length=nrep)
+
+
+ for (i in  seq_len(nrep)) {
+   # run a null model
+  sim_data<-gen_dyadic(cn=510,
+                               con_icc_wtn = 100,
+                                con_icc_btw = 18.18182,
+                                cat_icc_wtn = 100,
+                              cat_icc_btw = 18.18182,
+                               beta1=0.3,
+                               beta2=0.1,
+                               beta3=0.1,
+                               )
+   sim_data<-dyad2ind(sim_data)
+   null<-lmer(yhuman ~ 1 + (1|pid)z)
+  sim_result[[k]] <- jtools::summ(null) # put nicer output in the list
+   icc[[k]]<-unlist(sim_result[[k]][3])[3] #extract ICC
+
+  }
+   df <- data.frame(matrix(unlist(icc), nrow=length(icc), byrow=TRUE))
+  colnames(df) <- c('icc')
+  df$icc2 <-as.numeric(df$icc)
+  # mean of these icc CHECK
+  meanICC <- mean(df$icc2)
+
+  conditions$real_ICC[i] <- meanICC
+}
+
+```

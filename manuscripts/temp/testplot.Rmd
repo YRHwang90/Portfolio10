@@ -1,0 +1,55 @@
+---
+title: "Untitled"
+author: "Yoo Ri Hwang"
+date: '2022-06-06'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(tidyverse)
+
+
+sig_rate<-read.csv("type1error/sig_rate_with_conditions.csv")
+sig_rate2<-read.csv("type1error/sig_rate_0.1alpha.csv")
+
+
+sig_rate$X<-NULL
+sig_rate$X.1<-NULL
+sig_rate2$X<-NULL
+sig_rate2$X.1<-NULL
+
+sig_rate<-sig_rate[,grep("_gender|ev|catbtw|fxg|fxe|nxe|nxc|CN|beta|ICC",names(sig_rate))]
+sig_rate2<-sig_rate2[,grep("_gender|ev|catbtw|fxg|fxe|nxe|nxc|CN|beta|ICC",names(sig_rate2))]
+
+
+sig_rate$beta2_factor<-as.factor(sig_rate$beta2)
+sig_rate$beta3_factor<-as.factor(sig_rate$beta3)
+sig_rate$ICC_factor<-as.factor(sig_rate$ICC)
+sig_rate$CN_factor <- as.factor(sig_rate$CN)
+
+
+sig_rate2$beta2_factor<-as.factor(sig_rate2$beta2)
+sig_rate2$beta3_factor<-as.factor(sig_rate2$beta3)
+sig_rate2$ICC_factor<-as.factor(sig_rate2$ICC)
+sig_rate2$CN_factor <- as.factor(sig_rate2$CN)
+
+```
+```{r}
+p<- ggplot(sig_rate2, aes(y= sig_rate[,i], x= ICC, colour = beta3_factor, size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+      ylab(colnames(sig_rate[i]))+
+   theme(panel.background= element_rect(fill = "grey"))
+ 
+    model <- lm(paste(colnames(sig_rate[i]),"~ICC+beta2+beta3+CN"), data=sig_rate)
+    
+    sum<-summary(model)
+    
+    out<-list(p,sum)
+    print(out)
+
+```

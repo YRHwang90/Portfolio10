@@ -1,0 +1,241 @@
+---
+title: "Singularity_issue"
+author: "Yoo Ri Hwang"
+date: '2022-07-01'
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# overview
+
+The results of this research project showed that some of multilevel models have singularity issues. In this document, I tried to look closely how singularity rate are related to other conditions, such as CN (sample size), beta2 (gender effects), beta3 (interaction effect), and ICC. 
+
+## pacakge
+```{r}
+library(tidyverse)
+library(apaTables)
+```
+
+## Make informative table
+
+### condition information 
+```{r}
+
+conditions<-read.csv("conditions/Conditions_summary.csv")
+conditions<-conditions %>% 
+  rename(
+    CN = cn,
+    ICC = target_ICC
+    )
+
+# this is for merging 
+conditions_con<-conditions %>%
+  dplyr::select("CN","beta1","beta2","beta3","ICC","condition")
+```
+
+load data 
+
+```{r}
+
+singularity<-read.csv("appendix/singularity.csv")
+psuedo_ICC<-read.csv("appendix/psuedo_ICC.csv")
+sing_psuedo<-read.csv("appendix/singularity_with_psuedoICC.csv")
+mlm56<-sing_psuedo[,grep("CN|beta|condition|ICC|MLM5|MLM6",names(sing_psuedo))]
+# 
+# singularity<-merge(singularity,conditions_con, key="condition")
+# pseudo_ICC<-merge(psuedo_ICC,conditions_con, key="condition")
+# 
+
+# write.csv(singularity,"appendix/singularity.csv")
+# write.csv(psuedo_ICC,"appendix/psuedo_ICC.csv")
+# 
+# singularity_with_psuedoICC<-merge(singularity, pseudo_ICC, merge="condition")
+# write.csv(sing_psuedo,"appendix/singularity_with_psuedoICC.csv")
+```
+
+## Regression
+
+### Regression as a whole 
+
+put singularity rate as a DV, and other conditions as IVs. 
+```{r}
+
+# data reshaping 
+
+sing_psuedo$X<-NULL
+singularity$X<-NULL
+
+singularity_long<-singularity %>%
+  pivot_longer(
+    cols=c('singularity_MLM0','singularity_MLM1','singularity_MLM2','singularity_MLM3','singularity_MLM4','singularity_MLM5','singularity_MLM6'),
+    names_to = "model_type",
+    values_to = "singularity_rate"
+  )
+
+## regression
+
+### reminder: beta1 only have 0.3 in every condition 
+
+sin<-lm(singularity_rate ~ factor(model_type)+ICC+beta2+beta3+CN,data=singularity_long)
+summary(sin)
+
+sin_factor<-lm(singularity_rate ~ factor(model_type)+factor(ICC)+factor(beta2)+factor(beta3)+factor(CN),data=singularity_long)
+summary(sin_factor)
+#apa.reg.table(sin_factor, filename="tables/singularity_regression.doc")
+
+## remove ICC
+
+
+sin<-lm(singularity_rate ~ factor(model_type)+beta2+beta3+CN,data=singularity_long)
+summary(sin)
+
+sin_factor<-lm(singularity_rate ~ factor(model_type)+factor(beta2)+factor(beta3)+factor(CN),data=singularity_long)
+summary(sin_factor)
+    
+```
+
+### regression with predictors such as (with/out interaction, the type of gender composition)
+
+ 
+ 1) is singularity rate  related to whether the model contains interaction term(s) or not?
+ 2) is singularity rate related to how gender variable was coded?
+ 
+ 
+ 
+```{r}
+
+singularity_long <- singularity_long %>%
+  mutate(
+    interaction=case_when(
+      model_type=="singularity_MLM0" ~ "NO",
+      model_type=="singularity_MLM1" ~ "NO",
+      model_type=="singularity_MLM2" ~ "YES",
+      model_type=="singularity_MLM3" ~ "NO",
+      model_type=="singularity_MLM4" ~ "YES",
+      model_type=="singularity_MLM5" ~ "NO",
+      model_type=="singularity_MLM6" ~ "YES"
+    ),
+    gender=case_when(
+      model_type=="singularity_MLM0" ~ "no_gender_variable",
+      model_type=="singularity_MLM1" ~ "individual", # wheter individual is male/female
+      model_type=="singularity_MLM2" ~ "individual",
+      model_type=="singularity_MLM3" ~ "same_mixed",
+      model_type=="singularity_MLM4" ~ "same_mixed",
+      model_type=="singularity_MLM5" ~ "mm_ff_mixed",
+      model_type=="singularity_MLM6" ~ "mm_ff_mixed"
+    )
+  )
+
+# set reference group 
+singularity_long$gender <- relevel(factor(singularity_long$gender), ref="no_gender_variable")
+
+#regression (numeric)
+sin<-lm(singularity_rate ~ factor(interaction)+factor(gender)+ICC+beta2+beta3+CN,data=singularity_long)
+summary(sin)
+
+#regression (Factor)
+
+sin_factor<-lm(singularity_rate ~ factor(interaction)+factor(gender)+factor(ICC)+factor(beta2)+factor(beta3)+factor(CN),data=singularity_long)
+summary(sin_factor)
+ 
+#apa.reg.table(sin_factor, filename="tables/singularity_regression.doc")
+
+
+```
+
+remove ICC
+
+```{r}
+
+
+#regression (numeric)
+sin<-lm(singularity_rate ~ factor(interaction)+factor(gender)+ICC+beta2+beta3+CN,data=singularity_long)
+summary(sin)
+
+#regression (Factor)
+
+sin_factor<-lm(singularity_rate ~ factor(interaction)+factor(gender)+factor(ICC)+factor(beta2)+factor(beta3)+factor(CN),data=singularity_long)
+summary(sin_factor)
+
+```
+
+### regression per model (closer look)MLM3 MLM4, MLM5, MM6 
+
+Because MLM3, MLM4, MLM5, MLM6 showed high singularity rate, we closely look each model's signualrity rate to get a clear picture. 
+
+#### regression on singularity rate of MLM3
+
+ICC were not sig, and removed from the regression equation 
+
+```{r}
+
+
+# 
+# 
+# m3<-lm(singularity_MLM4~CN+beta2+beta3+ICC,data=singularity)
+# m3_factor<-lm(singularity_MLM4~factor(CN)+factor(beta2)+factor(beta3)+factor(ICC),data=singularity)
+# 
+# summary(m3)
+# summary(m3_factor)
+
+
+
+m3<-lm(singularity_MLM4~CN+beta2+beta3,data=singularity)
+m3_factor<-lm(singularity_MLM4~factor(CN)+factor(beta2)+factor(beta3),data=singularity)
+
+summary(m3)
+summary(m3_factor)
+
+```
+
+
+
+
+
+#### regression on singularity rate of MLM4
+
+ICC were not sig, and removed from the regression equation 
+```{r}
+# m4<-lm(singularity_MLM4~CN+beta2+beta3+ICC,data=singularity)
+# m4_factor<-lm(singularity_MLM4~factor(CN)+factor(beta2)+factor(beta3)+factor(ICC),data=singularity)
+# 
+# summary(m4)
+# summary(m4_factor)
+
+m4<-lm(singularity_MLM4~CN+beta2+beta3,data=singularity)
+m4_factor<-lm(singularity_MLM4~factor(CN)+factor(beta2)+factor(beta3),data=singularity)
+
+summary(m4)
+summary(m4_factor)
+
+```
+
+#### regression on singularity rate of MLM5
+
+ICC were non sig, removed from reg equation 
+```{r}
+
+m5<-lm(singularity_MLM5~CN+beta2+beta3,data=singularity)
+m5_factor<-lm(singularity_MLM5~factor(CN)+factor(beta2)+factor(beta3),data=singularity)
+
+summary(m5)
+summary(m5_factor)
+```
+
+#### regression on singularity rate of MLM6
+
+ICC were non sig, removed from reg equation 
+
+```{r}
+
+### regression on singularity rate of MLM6
+m6<-lm(singularity_MLM6~CN+beta2+beta3,data=singularity)
+m6_factor<-lm(singularity_MLM6~factor(CN)+factor(beta2)+factor(beta3),data=singularity)
+
+summary(m6)
+summary(m6_factor)
+
+```

@@ -1,0 +1,866 @@
+---
+title: "Plot AND regression for Check "
+author: "Yoo Ri Hwang"
+date: "6/5/2022"
+output: github_document
+---
+
+# setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## load the package
+
+```{r library}
+#install.packages("gtsummary")
+library(tidyverse)
+# library(gtsummary)
+# ## https://github.com/R-Computing-Lab/target-causalclaims/blob/main/R/utils_prettify-results.R
+# prettify_regression_results <- function(regression_object) {
+#   regression_object %>%
+#     gtsummary::tbl_regression(intercept=TRUE) %>%
+#     gtsummary::add_glance_source_note(
+#       label = list(statistic ~ "F-statistic",
+#                    df  ~ "DF1",
+#                    df.residual  ~ "DF2"),
+#       include = c(r.squared, statistic, df, df.residual, p.value, nobs)
+#       ) %>%
+#     gtsummary::modify_header(
+#       statistic ~ "**t-statistic**", p.value ~ "**p-value**"
+#       )
+# }
+```
+
+## load the data
+
+```{r data}
+sig_rate<-read.csv("type1error/sig_rate_with_conditions.csv")
+sig_rate_01alpha<-read.csv("type1error/sig_rate_0.01alpha.csv")
+```
+
+## EVERYTHING
+
+```{r cleaning}
+# 
+sig_rate$X<-NULL
+sig_rate$X.1<-NULL
+sig_rate_01alpha$X<-NULL
+sig_rate_01alpha$X.1<-NULL
+# 
+# write.csv(sig_rate,"type1error/sig_rate_with_conditions.csv")
+# write.csv(sig_rate_01alpha, "type1error/sig_rate_0.01alpha.csv")
+# if you want to see only categorical/interaction terms variable
+# sig_rate<-sig_rate[,grep("_gender|ev|catbtw|fxg|fxe|nxe|nxc|CN|beta|ICC",names(sig_rate))]
+# sig_rate_01alpha<-sig_rate_01alpha[,grep("_gender|ev|catbtw|fxg|fxe|nxe|nxc|CN|beta|ICC",names(sig_rate_01alpha))]
+sig_rate$beta2_factor<-as.factor(sig_rate$beta2)
+sig_rate$beta3_factor<-as.factor(sig_rate$beta3)
+sig_rate$ICC_factor<-as.factor(sig_rate$ICC)
+sig_rate$CN_factor <- as.factor(sig_rate$CN)
+sig_rate_01alpha$beta2_factor<-as.factor(sig_rate_01alpha$beta2)
+sig_rate_01alpha$beta3_factor<-as.factor(sig_rate_01alpha$beta3)
+sig_rate_01alpha$ICC_factor<-as.factor(sig_rate_01alpha$ICC)
+sig_rate_01alpha$CN_factor <- as.factor(sig_rate_01alpha$CN)
+### data reshaping for plotting  for 0.05 alpha 
+# wide to long 
+sig_rate_long<-sig_rate%>%
+  pivot_longer( cols=-c("beta1","condition","beta2","beta3","ICC","CN",
+                        "beta2_factor","beta3_factor","ICC_factor","CN_factor"),
+    names_to = c('coef', 'model'),
+               names_sep = '(?<=_p_)')
+sig_rate_long_01alpha<-sig_rate_01alpha%>%
+  pivot_longer( cols=-c("beta1","condition","beta2","beta3","ICC","CN",
+                        "beta2_factor","beta3_factor","ICC_factor","CN_factor"),
+    names_to = c('coef', 'model'),
+               names_sep = '(?<=_p_)')
+# corresponding variable. 
+## make a categorical variable
+## this variable indicate this effect. (i.e., edu within , gendern between effect etc. )
+sig_rate_long <- sig_rate_long %>%
+  mutate(
+    correspond = case_when(
+      coef=="coef_con_diff_p_" ~ "edu_within",
+      coef=="coef_con_diffxev1_p_" ~ "interaction",
+      coef=="coef_con_diffxev2_p_" ~ "interaction",
+      coef=="coef_con_diffxgender_composition_two_eff_p_" ~ "interaction",
+      coef=="coef_con_mean_p_" ~ "edu_between",
+      coef=="coef_ev1_p_" ~ "gender_between",
+      coef=="coef_ev2_p_" ~ "gender_between",
+      coef=="coef_fixed_catbtw_p_" ~ "gender_between",
+      coef=="coef_fixed_catwtn_p_" ~ "gender_within",
+      coef=="coef_fixed_catwtnxcon_p_"  ~ "interaction",
+      coef=="coef_fixed_con_p_" ~ "edu_within",
+      coef=="coef_fixed_conxcatbtw_p_" ~ "interaction",
+      coef=="coef_fixed_conxev1_p_" ~ "interaction",
+      coef=="coef_fixed_conxev2_p_" ~ "interaction",
+      coef=="coef_fixed_ev1_p_" ~ "gender_between",
+      coef=="coef_fixed_ev2_p_" ~ "gender_between",
+      coef=="coef_fixed_Intercept_p_" ~ "intercept",
+      coef=="coef_gender_composition_two_eff_p_"~"gender_between",
+      coef=="coef_intercept_p_" ~ "intercept",
+      coef=="coef_y_mean_p_" ~ "health_between",
+      coef=="f_p_" ~ "F_test_dyadic"
+    )
+  )
+sig_rate_long_01alpha <- sig_rate_long_01alpha %>%
+  mutate(
+    correspond = case_when(
+      coef=="coef_con_diff_p_" ~ "edu_within",
+      coef=="coef_con_diffxev1_p_" ~ "interaction",
+      coef=="coef_con_diffxev2_p_" ~ "interaction",
+      coef=="coef_con_diffxgender_composition_two_eff_p_" ~ "interaction",
+      coef=="coef_con_mean_p_" ~ "edu_between",
+      coef=="coef_ev1_p_" ~ "gender_between",
+      coef=="coef_ev2_p_" ~ "gender_between",
+      coef=="coef_fixed_catbtw_p_" ~ "gender_between",
+      coef=="coef_fixed_catwtn_p_" ~ "gender_within",
+      coef=="coef_fixed_catwtnxcon_p_"  ~ "interaction",
+      coef=="coef_fixed_con_p_" ~ "edu_within",
+      coef=="coef_fixed_conxcatbtw_p_" ~ "interaction",
+      coef=="coef_fixed_conxev1_p_" ~ "interaction",
+      coef=="coef_fixed_conxev2_p_" ~ "interaction",
+      coef=="coef_fixed_ev1_p_" ~ "gender_between",
+      coef=="coef_fixed_ev2_p_" ~ "gender_between",
+      coef=="coef_fixed_Intercept_p_" ~ "intercept",
+      coef=="coef_gender_composition_two_eff_p_"~"gender_between",
+      coef=="coef_intercept_p_" ~ "intercept",
+      coef=="coef_y_mean_p_" ~ "health_between",
+      coef=="f_p_" ~ "F_test_dyadic"
+    )
+  )
+# I tried to draw big giant plot, but r says thare are restrictions ( maximum number of points/ maximum number of levels) so, let's split a data. that's not an ideal way to do so, but R is not not perfect
+## by sample size 
+sig_rate_long_CN30<- sig_rate_long %>%
+  subset(CN==30)
+sig_rate_long_CN120<- sig_rate_long %>%
+  subset(CN==120)
+sig_rate_long_CN510<- sig_rate_long %>%
+  subset(CN==510)
+# by corresponds 
+sig_rate_long_edu_between<- sig_rate_long %>%
+  subset(correspond=="edu_between")
+sig_rate_long_edu_within<- sig_rate_long %>%
+  subset(correspond=="edu_within")
+sig_rate_long_F_test_dyadic<- sig_rate_long %>%
+  subset(correspond=="F_test_dyadic")
+sig_rate_long_gender_between<- sig_rate_long %>%
+  subset(correspond=="gender_between")
+sig_rate_long_gender_within<- sig_rate_long %>%
+  subset(correspond=="gender_within")
+sig_rate_long_health_between<- sig_rate_long %>%
+  subset(correspond=="health_between")
+sig_rate_long_interaction<- sig_rate_long %>%
+  subset(correspond=="interaction")
+sig_rate_long_intercept<- sig_rate_long %>%
+  subset(correspond=="intercept")
+# I tried to draw big giant plot, but r says thare are restrictions ( maximum number of points/ maximum number of levels) so, let's split a data. that's not an ideal way to do so, but R is not not perfect
+## by sample size 
+sig_rate_long_01alpha_CN30<- sig_rate_long_01alpha %>%
+  subset(CN==30)
+sig_rate_long_01alpha_CN120<- sig_rate_long_01alpha %>%
+  subset(CN==120)
+sig_rate_long_01alpha_CN510<- sig_rate_long_01alpha %>%
+  subset(CN==510)
+# by corresponds 
+## make a categorical variable
+## this variable indicate this effect. (i.e., edu within , gendern between effect etc. )
+sig_rate_long_01alpha_edu_between<- sig_rate_long_01alpha %>%
+  subset(correspond=="edu_between")
+sig_rate_long_01alpha_edu_within<- sig_rate_long_01alpha %>%
+  subset(correspond=="edu_within")
+sig_rate_long_01alpha_F_test_dyadic<- sig_rate_long_01alpha %>%
+  subset(correspond=="F_test_dyadic")
+sig_rate_long_01alpha_gender_between<- sig_rate_long_01alpha %>%
+  subset(correspond=="gender_between")
+sig_rate_long_01alpha_gender_within<- sig_rate_long_01alpha %>%
+  subset(correspond=="gender_within")
+sig_rate_long_01alpha_health_between<- sig_rate_long_01alpha %>%
+  subset(correspond=="health_between")
+sig_rate_long_01alpha_interaction<- sig_rate_long_01alpha %>%
+  subset(correspond=="interaction")
+sig_rate_long_01alpha_intercept<- sig_rate_long_01alpha %>%
+  subset(correspond=="intercept")
+```
+
+# plot interactions
+
+(only variables that corresponding to categorical/interaction term)
+
+## when alpha 0.5
+
+### facet CN
+
+```{r plot1}
+start <- which( colnames(sig_rate)=="coef_fixed_conxev2_p_MLM6")
+for(i in 2:start){
+  
+ p<- ggplot(sig_rate, aes(y= sig_rate[,i], 
+                          x= ICC, 
+                          colour = beta3_factor, 
+                          size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+      ylab(colnames(sig_rate[i]))+
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")
+   
+ 
+    model <- lm(paste(colnames(sig_rate[i]),"~ICC+beta2+beta3+CN"), data=sig_rate)
+    sum<-summary(model) 
+    
+    model_fac <- lm(paste(colnames(sig_rate[i]),"~ICC_factor+beta2_factor+beta3_factor+CN_factor"), data=sig_rate) 
+  
+   sum_fac<-summary(model_fac)
+  
+    out<-list(p,sum,sum_fac)
+    print(out)
+    
+  
+  
+}
+```
+
+## when alpha is 0.01
+
+```{r plot2}
+for(i in 2:start){
+  
+ p<- ggplot(sig_rate_01alpha, aes(y= sig_rate[,i], 
+                                  x= ICC, 
+                                  colour = beta3_factor, 
+                                  size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+      ylab(colnames(sig_rate[i]))+
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")
+ 
+    model <- lm(paste(colnames(sig_rate_01alpha[i]),"~ICC+beta2+beta3+CN"), data=sig_rate_01alpha)
+    sum<-summary(model)
+    
+    
+    model_fac <- lm(paste(colnames(sig_rate_01alpha[i]),"~ICC_factor+beta2_factor+beta3_factor+CN_factor"), data=sig_rate_01alpha) 
+   sum_fac<-summary(model_fac)
+  
+    out<-list(p,sum,sum_fac)
+    print(out)
+    
+}
+```
+
+# comparing models
+
+## plotting alpha 0.05
+
+```{r plot3}
+## edu-between
+  ggplot(sig_rate_long_edu_between, 
+             aes(y= value, x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+    facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("edu_between")
+  
+  
+# edu_within
+ggplot(sig_rate_long_edu_within, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("edu_within")
+  
+# f-test for dyadic regression
+ggplot(sig_rate_long_F_test_dyadic, 
+             aes(y= value, 
+                 x= model,
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("F test's p value for regression approach")
+# gender_Between 
+ggplot(sig_rate_long_gender_between, 
+             aes(y= value, x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("gender_between")
+#gender_within
+ggplot(sig_rate_long_gender_within, 
+             aes(y= value, x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("gender_within")
+# health between
+ggplot(sig_rate_long_health_between, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("health_between")
+# interaction 
+ggplot(sig_rate_long_interaction, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction")
+# intercept 
+ggplot(sig_rate_long_intercept, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("intercept")
+```
+
+### Interaction plot more closely
+
+```{r}
+ggplot(sig_rate_long_interaction, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction")
+```
+
+#### split by the ICC/beta2/beta3/CN
+
+ICC 
+```{r}
+sig_rate_long_interaction_ICC2 <-sig_rate_long_interaction %>%
+  filter(ICC==0.2)
+sig_rate_long_interaction_ICC4 <-sig_rate_long_interaction %>%
+  filter(ICC==0.4)
+sig_rate_long_interaction_ICC8 <-sig_rate_long_interaction %>%
+  filter(ICC==0.8)
+ggplot(sig_rate_long_interaction_ICC2, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction ICC 0.2")
+ggplot(sig_rate_long_interaction_ICC4, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction ICC 0.4")
+ggplot(sig_rate_long_interaction_ICC8, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction ICC 0.8")
+# different facet 
+ggplot(sig_rate_long_interaction_ICC2, 
+             aes(y= value, 
+                 x= model, 
+                 colour = CN_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~beta3_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction ICC 0.2")
+ggplot(sig_rate_long_interaction_ICC4, 
+             aes(y= value, 
+                 x= model, 
+                 colour = CN_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~beta3_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction ICC 0.4")
+ggplot(sig_rate_long_interaction_ICC8, 
+             aes(y= value, 
+                 x= model, 
+                 colour = CN_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~beta3_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction ICC 0.8")
+```
+beta2 
+```{r}
+sig_rate_long_interaction_beta2_0 <-sig_rate_long_interaction %>%
+  filter(beta2_factor=="0")
+sig_rate_long_interaction_beta2_1 <-sig_rate_long_interaction %>%
+  filter(beta2_factor=="0.1")
+sig_rate_long_interaction_beta2_3 <-sig_rate_long_interaction %>%
+  filter(beta2_factor=="0.3")
+sig_rate_long_interaction_beta2_5 <-sig_rate_long_interaction %>%
+  filter(beta2_factor=="0.5")
+ggplot(sig_rate_long_interaction_beta2_0, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = ICC))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction beta2=0")
+ggplot(sig_rate_long_interaction_beta2_1, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = ICC))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction beta2=0.1")
+ggplot(sig_rate_long_interaction_beta2_3, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = ICC))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction beta2=0.3")
+ggplot(sig_rate_long_interaction_beta2_5, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = ICC))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction  beta2=0.5")
+```
+
+beta3 
+
+```{R}
+sig_rate_long_interaction_beta3_0 <-sig_rate_long_interaction %>%
+  filter(beta3_factor=="0")
+sig_rate_long_interaction_beta3_1 <-sig_rate_long_interaction %>%
+  filter(beta3_factor=="0.1")
+sig_rate_long_interaction_beta3_3 <-sig_rate_long_interaction %>%
+  filter(beta3_factor=="0.3")
+sig_rate_long_interaction_beta3_5 <-sig_rate_long_interaction %>%
+  filter(beta3_factor=="0.5")
+ggplot(sig_rate_long_interaction_beta3_0, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta2_factor, 
+                 size = ICC))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction beta3=0")
+ggplot(sig_rate_long_interaction_beta3_1, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta2_factor, 
+                 size = ICC))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction beta3=0.1")
+ggplot(sig_rate_long_interaction_beta3_3, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta2_factor, 
+                 size = ICC))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction beta3=0.3")
+ggplot(sig_rate_long_interaction_beta3_5, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta2_factor, 
+                 size = ICC))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction beta3=0.5")
+```
+
+
+CN
+
+```{r}
+sig_rate_long_interaction_CN30 <-sig_rate_long_interaction %>%
+  filter(CN==30)
+sig_rate_long_interaction_CN120 <-sig_rate_long_interaction %>%
+  filter(CN==120)
+sig_rate_long_interaction_CN510 <-sig_rate_long_interaction %>%
+  filter(CN==510)
+ggplot(sig_rate_long_interaction_CN30, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = ICC))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~beta2_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction_CN=30")
+ggplot(sig_rate_long_interaction_CN120, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = beta2_factor))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~beta2_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction_CN=120")
+ggplot(sig_rate_long_interaction_CN510, 
+             aes(y= value, 
+                 x= model, 
+                 colour = beta3_factor, 
+                 size = ICC))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~beta2_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction CN=510")
+```
+
+## plotting for 0.01 alpha
+
+```{r plot4}
+## edu-between
+  ggplot(sig_rate_long_01alpha_edu_between, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("edu_between")
+  
+  
+# edu_within
+ggplot(sig_rate_long_01alpha_edu_within, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("edu_within")
+  
+# f-test for dyadic regression
+ggplot(sig_rate_long_01alpha_F_test_dyadic, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("F test's p value for regression approach")
+# gender_Between 
+ggplot(sig_rate_long_01alpha_gender_between, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("gender_between")
+#gender_within
+ggplot(sig_rate_long_01alpha_gender_within, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("gender_within")
+# health between
+ggplot(sig_rate_long_01alpha_health_between, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.45) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("health_between")
+# interaction 
+ggplot(sig_rate_long_01alpha_interaction, 
+             aes(y= value, x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("interaction")
+# intercept 
+ggplot(sig_rate_long_01alpha_intercept, 
+             aes(y= value, 
+                 x= model, 
+                 shape= ICC_factor, 
+                 colour = beta3_factor, 
+                 size = beta2))+
+        geom_point(alpha=0.4) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+   geom_hline(yintercept=0.80, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 75, vjust = 0.5, hjust=1))+
+  ggtitle("intercept")
+```
+
+# type  1 error rate plot
+
+
+## when there is no gender effect, but detected gender effect 
+```{R}
+# when there is no gender effect, but it detected
+beta2<-read.csv("type1error/beta2.csv")
+beta2$X<-NULL
+beta2$beta3_factor<-as.factor(beta2$beta3)
+beta2$ICC_factor<-as.factor(beta2$ICC)
+beta2$CN_factor<-as.factor(beta2$CN)
+beta2_long <- beta2 %>%
+  pivot_longer( cols=-c("beta1","condition","beta2","beta3","ICC","CN",
+                        "beta3_factor","ICC_factor","CN_factor"),
+    names_to = c('coef', 'model'),
+               names_sep = '(?<=_p_)')
+beta2_list <- beta2_long %>% 
+  group_split(model)
+for(i in 1:length(beta2_list)){
+p<-ggplot(beta2_list[[i]], 
+             aes(y= value, 
+                 x= coef,
+                 colour=ICC_factor) 
+                )+
+        geom_point(alpha=0.4, size = 10) +
+          facet_wrap(~CN) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 30, vjust = 0.5, hjust=1))+
+  ggtitle("When there is no gender effect but the variable detects (also no interaction effect), but corresponding to gender effect variables  ") +
+  ylab(beta2_list[[i]][["model"]][1])
+print(p)
+}
+```
+
+## when there is no interaction effect, but detect interaction effect
+
+```{r}
+beta3<-read.csv("type1error/beta3.csv")
+beta3$X<-NULL
+beta3$beta3_factor<-as.factor(beta3$beta3)
+beta3$ICC_factor<-as.factor(beta3$ICC)
+beta3$CN_factor<-as.factor(beta3$CN)
+beta3_long <- beta3 %>%
+  pivot_longer( cols=-c("beta1","condition","beta2","beta3","ICC","CN",
+                        "beta3_factor","ICC_factor","CN_factor"),
+    names_to = c('coef', 'model'),
+               names_sep = '(?<=_p_)')
+beta3_list <- beta3_long %>% 
+  group_split(model)
+for(i in 1:length(beta3_list)){
+p<-ggplot(beta3_list[[i]], 
+             aes(y= value, 
+                 x= coef,
+                 colour=ICC_factor) 
+                )+
+        geom_point(alpha=0.4, size = 10) +
+          facet_wrap(~ CN_factor) +
+   scale_colour_brewer(palette="OrRd") + 
+   theme(panel.background= element_rect(fill = "grey"))+
+   geom_hline(yintercept=0.05, linetype="dashed")+
+  theme(axis.text.x = element_text(angle = 30, vjust = 0.5, hjust=1))+
+  ggtitle("When there is no interaction effect but the variable detects") +
+  ylab(beta3_list[[i]][["model"]][1])
+print(p)
+  }
+```

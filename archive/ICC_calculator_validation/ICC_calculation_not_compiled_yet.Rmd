@@ -1,0 +1,256 @@
+---
+title: "targeted_ICC_validation"
+author: "Yoo Ri Hwang"
+date: "4/17/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##packages
+```{r}
+
+library(tidyverse)
+library(MASS)
+library(jtools) #to get nicer output
+library(lme4)
+library(lmerTest)
+
+library(multilevel)
+library(nlme)
+library(simstudy)
+library(rlist)
+library(readxl)
+```
+
+## function
+
+```{r, eval=FALSE}
+
+
+# Data generation function (dyad structure)
+source('scripts/gen_dyadic.R')
+source('scripts/gen_rmvn.R')
+
+# function to convert dyad structure into dyad2individual structure
+source('scripts/dyad_to_long.R')
+
+# the function for sibling comparison model
+source('scripts/model_sib.R')
+
+# the function for null model
+source('scripts/model_null.R')
+
+# the function for mlm model
+source('scripts/model_mlm.R')
+
+# the function for ICC weight calculator
+source('scripts/ICC_calculator.R')
+
+
+```
+
+## Vaildation
+### check the ICC for generated data (per condition)
+
+```{r}
+
+conditions<-read.csv(file='ICC_calculator_validation/ICC_Conditions.csv')
+# conditions$ID <- 1:36
+# conditions$wtn <- 100  # within ICC weights 
+# 
+# 
+# # creat a loop
+# conditions <- as.data.frame(conditions)
+# 
+# for(i in 1:36){
+#  conditions$btw[i]<-ICC_calculator( 
+#    
+#    beta1 = conditions$beta1[i],
+#    beta2 = conditions$beta2[i],
+#    beta3 = conditions$beta3[i],
+#    ICC = conditions$targeted_ICC[i],
+#    within= conditions$wtn[i]
+#  )
+# }
+# 
+# write.csv(conditions, file='ICC_calculator_validation/ICC_Conditions.csv')
+
+```
+
+```{r}
+
+
+nrep <- 999
+sim_result <- vector ("list", length = nrep)
+icc <- vector("list", length=nrep)
+
+
+for( i in 1:36){
+
+    sim_dat <- gen_dyadic(
+    cn= 510,
+    beta1 = conditions$beta1[i],
+    beta2 = conditions$beta2[i],
+    beta3 = conditions$beta3[i],
+    con_icc_wtn = conditions$wtn[i],
+    con_icc_btw = conditions$btw[i],
+    cat_icc_wtn = conditions$wtn[i],
+    cat_icc_btw = conditions$btw[i])
+
+  sim_dat <- dyad2ind(sim_dat)
+  null <- model_null(df=sim_dat)
+
+  for (k in  seq_len(nrep)) {
+   # run a null model
+
+  sim_result[[k]] <- jtools::summ(null) # put nicer output in the list
+   icc[[k]]<-unlist(sim_result[[k]][3])[3] #extract ICC
+
+  }
+   df <- data.frame(matrix(unlist(icc), nrow=length(icc), byrow=TRUE))
+  colnames(df) <- c('icc')
+  df$icc2 <-as.numeric(df$icc)
+  # mean of these icc CHECK
+  meanICC <- mean(df$icc2)
+
+  conditions$real_ICC[i] <- meanICC
+}
+
+
+
+```
+
+```{r, eval=FALSE}
+# nrep<-999
+# sim_result <- vector ("list", length = nrep)
+# 
+# icc <- vector("list", length=nrep)
+# for(k in 1:36)
+# for (i in seq_len(nrep)) {
+#   sim_dat <- gen_dyadic(cn=510,
+#   con_icc_wtn = 100,
+#   con_icc_btw = 17.5,
+#   cat_icc_wtn = 100,
+#   cat_icc_btw = 17.5,
+#   beta1 = 0.3,
+#   beta2 = 0.1,
+#   beta3 = 0) # generate data 
+#   sim_dat <- dyad2ind(sim_dat) # convert dyadic structure into dyad2individual structure 
+#   null <- lmer(y~1+(1|pid), data=sim_dat) # run a null model 
+#   sim_result[[i]] <- jtools::summ(null) # put nicer output in the list 
+#    icc[[i]]<-unlist(sim_result[[i]][3])[3] #extract ICC 
+# }
+# 
+# # Make a nicer output for it
+# 
+#   df <- data.frame(matrix(unlist(icc), nrow=length(icc), byrow=TRUE))
+#   # Change column names
+#   colnames(df) <- c('icc')
+#   df$icc2 <-as.numeric(df$icc)
+#   # mean of these icc CHECK
+#   meanICC <- mean(df$icc2)
+#   
+#   # visualize CHECK
+#   graph<-
+#     df %>%
+#     ggplot(aes(x=icc2)) +
+#     geom_density()
+#   
+# 
+# 
+
+```
+
+
+# example: 
+
+##   data1
+
+ICC = 0.2 
+Cluster size= 30
+beta1= 0.3
+beta2= 0.1 
+beta3= 0.1 
+
+## data generation 
+```{r}
+
+data1 <- gen_dyadic(
+  cn=30,
+  con_icc_wtn = 34,
+  con_icc_btw = 1,
+  cat_icc_wtn = 34,
+  cat_icc_btw = 1,
+  beta1 = 0.3,
+  beta2 = 0.1,
+  beta3 = 0.1
+)
+
+```
+## checking ICC 
+
+due to the small cn (cluster number)
+it throws error message :
+boundary (singular) fit: see ?isSingular
+
+```{r}
+
+
+ # number of replication
+# make empty list (place holder)
+ 
+  # creat a loop
+
+nrep<-999
+
+sim_result <- vector ("list", length = nrep)
+
+icc <- vector("list", length=nrep)
+
+for (i in seq_len(nrep)) {
+  sim_dat <- gen_dyadic(cn=510,
+  con_icc_wtn = 100,
+  con_icc_btw = 230,
+  cat_icc_wtn = 100,
+  cat_icc_btw = 230,
+  beta1 = 0.3,
+  beta2 = 0.1,
+  beta3 = 0.5) # generate data
+  
+  sim_dat <- dyad2ind(sim_dat) 
+  # convert dyadic structure into dyad2individual structure 
+  null <- lmer(y~1+(1|pid), data=sim_dat) # run a null model 
+  sim_result[[i]] <- jtools::summ(null) # put nicer output in the list 
+   icc[[i]]<-unlist(sim_result[[i]][3])[3] }#extract ICC 
+   
+  df <- data.frame(matrix(unlist(icc), nrow=length(icc), byrow=TRUE))
+   colnames(df) <- c('icc')
+  df$icc2 <-as.numeric(df$icc)
+  meanICC <- mean(df$icc2)
+  meanICC 
+
+
+# Make a nicer output for it
+
+  df <- data.frame(matrix(unlist(icc), nrow=length(icc), byrow=TRUE))
+  # Change column names
+  colnames(df) <- c('icc')
+  df$icc2 <-as.numeric(df$icc)
+  # mean of these icc CHECK
+  meanICC <- mean(df$icc2)
+  
+  # visualize CHECK
+  graph<-
+    df %>%
+    ggplot(aes(x=icc2)) +
+    geom_density()
+  
+  ## 
+  graph
+  meanICC
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

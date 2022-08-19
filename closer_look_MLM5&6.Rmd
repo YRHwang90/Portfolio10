@@ -1,0 +1,125 @@
+---
+title: "closer_look_MLM5&MLM6"
+author: "Yoo Ri Hwang"
+date: '2022-07-01'
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Overview
+
+MLM5: gender composition (ff mm mixed) without interaction
+MLM6 gender composition (FF mm mixed) with interaction 
+
+Under certain conditions, it shows 100% of singularity and 0 pseudo ICC in MLM5 and MLM6. 
+In this document, we attempt to get closer look into how generated data are fitted into MLM5 and MLM6. 
+
+So, this is NOT main documents. 
+
+## load package 
+```{r}
+
+library(tidyverse)
+
+source('scripts/gen_dyadic.R')
+source('scripts/gen_rmvn.R')
+source('scripts/dyad_to_long.R')
+source('scripts/reconstruct.R')
+source('scripts/model_sib.R')
+source('scripts/model_null.R')
+source('scripts/model_mlm.R')
+source('scripts/ICC_calculator.R')
+source('scripts/myTryCatch.R')
+source('scripts/hasConverged.R')
+```
+
+
+### Table
+```{r}
+
+#overall singularity rate and psuedoICC across all multilevel model 
+table<-read.csv("appendix/singularity_with_psuedoICC.csv")
+
+# pick mlm5 and mlm 6
+
+mlm56<-table[,grep("CN|beta|condition|ICC|MLM5|MLM6",names(table))]
+```
+
+## generate raw dataset, and fit into MLM5 and MLM6
+
+### data generated per each condition (one dataset per one condition) 
+117 conditions
+```{r}
+set.seed(5)
+# condition information
+
+
+conditions<-read.csv("conditions/Conditions_summary.csv")
+ncond<-nrow(conditions)
+
+# empty holder to put generated dataset
+
+
+dyad_data<-vector(mode = "list", length = ncond)
+
+### generate the data 
+
+for (j in 1:ncond) {
+
+  
+    sim_data <- gen_dyadic(
+    cn = conditions$cn[j],
+    beta1 = conditions$beta1[j],
+    beta2 = conditions$beta2[j],
+    beta3 = conditions$beta3[j],
+    con_icc_wtn = conditions$wtn[j],
+    con_icc_btw = conditions$btw[j],
+    cat_icc_wtn = conditions$wtn[j],
+    cat_icc_btw = conditions$btw[j])
+    
+    dyad_data[[j]]<-sim_data
+}
+
+
+## holder  for generated data so that I can keep the data
+ind_data<-vector(mode = "list", length = ncond)
+
+
+# dyad_data has dyadic structure. let's convert it into individual structure so that I can run multilevel model
+
+for(i in 1:ncond){
+ind_data[[i]]<-dyad2ind(dyad_data[[i]])
+}
+```
+### fit that into MLM5 and MLM6 
+
+```{r}
+# empty holder for generated data 
+
+MLM5<-vector("list",length=ncond)
+MLM6<-vector("list",length=ncond)
+sum_MLM5<-vector("list",length=ncond)
+sum_MLM6<-vector("list",length=ncond)
+
+## fit the data into the models (MLM5, MLM6)
+
+for(i in 1:ncond){
+
+MLM5[[i]]<- yes2model(data=ind_data[[i]],
+                gender_composition=3,
+                interaction=FALSE)
+
+MLM6[[i]]<- yes2model(data=ind_data[[i]],
+                gender_composition=3,
+                interaction=TRUE)
+print(paste0(i," MLM5 cn:",conditions$cn[i]," ticc: ",conditions$target_ICC[i]," b2:",conditions$beta2[i]," b3:",conditions$beta3[i]))
+print(sum_MLM5[[i]]<-summary(MLM5[[i]]))
+
+print(paste0(i," MLM6 cn:",conditions$cn[i]," ticc: ",conditions$target_ICC[i]," b2:",conditions$beta2[i]," b3:",conditions$beta3[i]))
+print(sum_MLM6[[i]]<-summary(MLM6[[i]]))
+}
+
+
+```

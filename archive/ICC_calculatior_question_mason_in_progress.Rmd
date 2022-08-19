@@ -1,0 +1,129 @@
+## This function generate within variance and between variance when
+#beta and ICC are provided.
+#
+# # The formula is as follows:
+# {beta1^2*b + beta2^2*b +1}/{beta1^2*b + beta2^2*b +1 + 1 + beta1^2*w + beta2^2*w + beta3^2*w^2}= targeted ICC
+
+
+# However, it does not seems to be correct. so, formula may have problem.
+## see the below comments
+
+
+```{r}
+
+source('scripts/gen_dyadic.R')
+source('scripts/dyad_to_long.R')
+ICC_calculator <- function(
+  beta1,
+  beta2,
+  beta3,
+  ICC,
+  one="ratio", # if one is btw, plug 1 into btw. if one is w, plug 1 into within.
+              # if it is ratio, it is determined by the numbers you put in the within argument
+  within)
+{
+
+  a<-beta1
+  b<-beta2
+  c<-beta3
+  d<-ICC
+  y<-within
+
+  if(one=="b"){
+    if(c==0)
+      x <- -((a^2 * (d - 1) + b^2 * (d - 1) + 2* d))/((d * (a^2 + b^2)))
+    return(X)
+
+    if(c!=0)
+
+      x1 <- -(sqrt(d* (d * (a^2 + b^2)^2 - 4 *c^2 *(a^2 *(d - 1) + b^2 *(d - 1) + 2* d - 1))) + a^2 * d + b^2* d)/(2 *c^2* d)
+      x2 <- (sqrt(d  * (d * (a^2 + b^2)^2 - 4 * c^2 * (a^2 * (d - 1) + b^2 *(d - 1) + 2*d - 1))) + a^2 * (-d) - b^2 *d)/(2 *c^2* d)
+
+      x<-list(x1, x2)
+      return(x)
+
+  }
+  if(one=="w"){
+
+    x <-((a^2 * (-d) - b^2 * d - c^2 * d - 2 * d + 1))/((d - 1)* (a^2 + b^2))
+    return(X)
+
+
+  }
+  if(one=="ratio"){
+    x <-((1 - d *(a^2 *y + b^2 * y + c^2 * y^2 + 2)))/((d - 1) *(a^2 + b^2))
+
+
+
+
+  }
+  return(x)
+}
+```
+
+```{r }
+
+library(jtools)
+library(tidyverse)
+library(lme4)
+## for example,
+## condition can be as follows:
+###   data1
+#
+# ICC = 0.2
+
+# beta1= 0.3
+# beta2= 0.1
+# beta3= 0.1
+
+ICC_calculator(beta1=0.3, beta2=0.2, beta3=0.1,ICC=0.2, one="ratio", within=100)
+
+#211.5385
+
+# So, If I put within 100, and between 211.5385, the ICC should be 0.2. however,
+
+#before run, activate gen_dyadic() and ind() function
+
+
+nrep = 100 # number of replication
+# make empty list (place holder)
+sim_result <- vector ("list", length = nrep)
+icc <- vector("list", length=nrep)
+# creat a loop
+
+for (i in seq_len(nrep)) {
+  sim_dat <- gen_dyadic(cn=120,
+                        con_icc_wtn = 100,
+                        con_icc_btw = 211.5385,
+                        cat_icc_wtn = 100,
+                        cat_icc_btw = 211.5385,
+                        beta1 = 0.3,
+                        beta2 = 0.1,
+                        beta3 = 0.1) # generate data
+  sim_dat <- dyad2ind(sim_dat) # convert dyadic structure into individual structure
+  null <- lmer(y~1+(1|pid), data=sim_dat) # run a null model
+  sim_result[[i]] <- jtools::summ(null) # put nicer output in the list
+  icc[[i]]<-unlist(sim_result[[i]][3])[3] #extract ICC
+}
+
+# Make a nicer output for it
+
+df <- data.frame(matrix(unlist(icc), nrow=length(icc), byrow=TRUE))
+# Change column names
+colnames(df) <- c('icc')
+df$icc2 <-as.numeric(df$icc)
+# mean of these icc CHECK
+meanICC <- mean(df$icc2)
+
+# visualize CHECK
+graph<-
+  df %>%
+  ggplot(aes(x=icc2)) +
+  geom_density()
+
+##
+graph
+meanICC # This should be 0.2, but it is way higher
+
+ICC_calculator
+```
